@@ -1,0 +1,217 @@
+================================================================================
+  MINIO MASTER — RESUMEN COMPLETO DE CONFIGURACIÓN
+================================================================================
+
+QUÉ SE CONSTRUYÓ
+────────────────
+Un sub-agente especialista en operar MinIO en producción sobre un VPS pequeño
+con Docker Compose, compuesto por tres piezas:
+
+  1. SKILL          ~/.claude/skills/minio-ops/SKILL.md
+                    624 líneas de conocimiento técnico construido sobre tu
+                    compose real: nombres de containers, puertos, bucket,
+                    rutas públicas, límite de memoria, y co-tenants del VPS.
+
+  2. SUB-AGENTE     ~/.claude/agents/minio-master.md
+                    140 líneas de comportamiento: 6 ramas de routing, 8 hard
+                    rules, formato de respuesta. Precarga el skill automáticamente.
+
+  3. COMANDOS       ~/.claude/commands/minio/
+                    5 comandos con prefijo /minio:* disponibles globalmente.
+
+
+ESTRUCTURA DE ARCHIVOS
+───────────────────────
+~/.claude/
+├── agents/
+│   └── minio-master.md             ← sub-agente MinIO (color: purple)
+├── commands/
+│   └── minio/
+│       ├── health.md               ← /minio:health
+│       ├── backup.md               ← /minio:backup
+│       ├── diagnose.md             ← /minio:diagnose
+│       ├── migrate.md              ← /minio:migrate
+│       └── sdk.md                  ← /minio:sdk
+└── skills/
+    └── minio-ops/
+        └── SKILL.md
+
+
+INSTALACIÓN
+────────────
+  mkdir -p ~/.claude/skills/minio-ops ~/.claude/commands/minio
+  cp minio-master.md ~/.claude/agents/
+  cp SKILL.md ~/.claude/skills/minio-ops/
+  cp commands/minio/*.md ~/.claude/commands/minio/
+
+  claude
+  /agents   # debe aparecer minio-master
+  /help     # debe listar /minio:*
+
+
+QUÉ CUBRE EL SKILL (12 SECCIONES)
+───────────────────────────────────
+  §1   Deployment context — compose real, puertos, co-tenants, redes Docker
+  §2   Daily operations — health check, logs, restart, SSH tunnel a consola
+  §3   Bucket y object management — mc commands, policy, pre-signed URLs
+  §4   Access control — usuarios, service accounts, políticas JSON por bucket
+  §5   Node.js SDK integration — forcePathStyle, endpoint Docker, TypeScript
+  §6   Performance tuning — memory limits, disk I/O, logging rotation
+  §7   Backup strategy — script completo, cron, offsite (B2/R2), restore
+  §8   TLS configuration — cuándo es necesario, self-signed, Nginx reverse proxy
+  §9   Troubleshooting — 10 categorías de causa raíz con fix exacto
+  §10  Migration planning — thresholds concretos, targets (B2/R2/S3), zero-downtime
+  §11  Compose file management — update image, scale down, env vars requeridos
+  §12  Architecture Decision Guide — tabla de decisiones para este contexto
+
+
+COMANDOS /minio:* — TABLA COMPLETA
+────────────────────────────────────
+
+  /minio:health
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Diagnóstico completo en secuencia: container status →
+              API health endpoint → memoria → disco → errores en logs
+              de la última hora. Devuelve flags CRITICAL/WARNING
+              con acción específica para cada problema detectado.
+  Thresholds  CRITICAL: memoria > 450M, API no responde, disco > 70%
+              WARNING: memoria > 350M, errores en log
+  Ejemplos    /minio:health
+              → corre todos los docker stats y curl en orden
+
+  /minio:backup [local|offsite|restore|script]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera el script de backup listo para copiar al VPS,
+              el cron job para automatizarlo (2am diario), y el
+              procedimiento completo de restore incluyendo el paso
+              crítico de restaurar las políticas públicas (logo/, blog/).
+  Offsite     Backblaze B2 ($1.20/TB) o Cloudflare R2 (zero egress)
+  Ejemplos    /minio:backup          → setup completo
+              /minio:backup script   → solo el script bash
+              /minio:backup restore  → solo el procedimiento de restore
+              /minio:backup offsite  → comparativa B2 vs R2 vs S3
+
+  /minio:diagnose [error]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Diagnostica errores con 10 categorías de causa raíz.
+              Primero los comandos de diagnóstico, luego el fix exacto.
+  Categorías  forcePathStyle missing / Wrong endpoint / Different Docker
+              network / Policy lost / minio-init failed / OOM kill /
+              413 upload / Disk full / Corrupt credentials / Permissions
+  Ejemplos    /minio:diagnose NoSuchBucket when API starts
+              /minio:diagnose 403 on public image URLs
+              /minio:diagnose SDK error: getaddrinfo ENOTFOUND shalapp.minio
+              /minio:diagnose MinIO container keeps restarting
+              /minio:diagnose disk is at 85% on the VPS
+
+  /minio:migrate [evaluate|plan|execute b2|r2|s3]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Evalúa si es momento de migrar comparando métricas actuales
+              contra thresholds concretos, recomienda el target (B2/R2/S3)
+              según presupuesto y volumen, y genera el procedimiento
+              zero-downtime completo (mirror → update env → restart API →
+              sync continuo → verificar 48h → remover MinIO).
+  Thresholds  Disco > 70% / Memoria > 450M sostenida / Storage > 50GB /
+              Latencia p95 > 500ms / OOM kills ≥ 2 por semana
+  Ejemplos    /minio:migrate           → evaluación completa
+              /minio:migrate evaluate  → solo check de thresholds
+              /minio:migrate target    → tabla comparativa B2 vs R2 vs S3
+              /minio:migrate execute b2 → procedimiento para Backblaze B2
+              /minio:migrate execute r2 → procedimiento para Cloudflare R2
+
+  /minio:sdk [upload|presigned|delete|exists|multipart|all]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera TypeScript completo para el shalapp-api con todo
+              lo que necesita el SDK de AWS S3 para conectarse a MinIO.
+              Siempre incluye: forcePathStyle: true, endpoint correcto
+              para Docker interno (http://minio:9000), region placeholder,
+              y las variables .env requeridas.
+  Crítico     forcePathStyle: true es OBLIGATORIO — sin eso el SDK
+              intenta resolver shalapp.minio:9000 y falla con ENOTFOUND
+  Ejemplos    /minio:sdk             → cliente completo con todas las ops
+              /minio:sdk upload      → solo función de upload
+              /minio:sdk presigned   → solo generación de URLs firmadas
+              /minio:sdk multipart   → multer + Express handler completo
+              /minio:sdk all         → storage.ts completo + .env vars
+
+
+ROUTING DEL AGENTE — 6 RAMAS
+──────────────────────────────
+  Health / Monitoring  → "is MinIO ok", "health", "status", "check",
+                         "logs", "memory", "slow", "not responding"
+  Bucket / Objects     → "bucket", "upload", "object", "list",
+                         "public access", "policy", "pre-signed URL"
+  Access Control       → "user", "credentials", "rotate", "policy",
+                         "service account", "access key"
+  SDK Integration      → "SDK", "S3Client", "connect", "forcePathStyle",
+                         "cannot connect from API", "presigned"
+  Troubleshooting      → "error", "fails", "403", "404", "413",
+                         "timeout", "OOM", "bucket not found"
+  Migration Decision   → "should I move", "getting too big", "Backblaze",
+                         "R2", "S3", "external storage", "when to migrate"
+
+
+HARD RULES — NUNCA VIOLA ESTAS 8
+──────────────────────────────────
+  1. Puertos 9000/9001 nunca expuestos sin TLS           [CRITICAL]
+  2. Root credentials nunca en el código del API          [CRITICAL]
+  3. forcePathStyle: true siempre en el SDK               [CRITICAL]
+  4. Distributed MinIO nunca en un VPS pequeño            [CRITICAL]
+  5. Restart de MinIO nunca para cambios de credentials   → restart API
+  6. minio_data volume nunca eliminado sin backup         [CRITICAL]
+  7. Políticas públicas siempre restauradas después de restore
+  8. Evaluar migración cuando disco llega al 70%          [WARNING]
+
+
+ANÁLISIS — QUÉ LO HACE ÚTIL
+─────────────────────────────
+  CONTEXTO REAL, NO GENÉRICO:
+  El skill conoce tu compose exacto — nombres de containers, puertos,
+  rutas públicas del bucket, y el hecho de que hay 3.2GB de RAM total
+  repartida entre 6 servicios. Los comandos que genera son copy-paste
+  directos sin necesidad de adaptar.
+
+  EL ERROR MÁS COMÚN YA ESTÁ CODIFICADO:
+  forcePathStyle: true es la causa del 80% de los problemas de
+  integración entre Node.js y MinIO. El agente lo incluye en todo
+  código generado y es el primer check en cualquier diagnóstico de
+  conexión desde el API.
+
+  MIGRATION CON THRESHOLDS CONCRETOS:
+  No "cuando sientas que es mucho". La tabla tiene números: 70% de
+  disco, 450MB de memoria sostenida, 50GB de storage. Cuando llegás
+  a esos números el agente ya tiene el procedimiento listo.
+
+  BACKUP QUE INCLUYE EL PASO QUE SE OLVIDA:
+  mc mirror copia objetos pero NO las políticas de bucket. El agente
+  siempre incluye el paso de restaurar mc anonymous set download
+  después de cualquier restore. Es el error más silencioso — las
+  imágenes públicas dejan de servirse sin error visible.
+
+
+CASOS DE USO RÁPIDOS
+─────────────────────
+  Verificar que MinIO está ok:
+    /minio:health
+
+  API no puede conectarse a MinIO:
+    /minio:diagnose connection refused from shalapp-api to minio
+
+  Generar código TypeScript para subir archivos:
+    /minio:sdk all
+
+  Planificar backup automatizado:
+    /minio:backup script
+
+  Evaluar si es momento de migrar a B2:
+    /minio:migrate evaluate
+
+
+VERIFICAR INSTALACIÓN
+──────────────────────
+  claude
+  /agents    → debe listar minio-master
+  /help      → debe listar /minio:*
+  /minio:health → corre diagnóstico real del container
+
+================================================================================

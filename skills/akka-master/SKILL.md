@@ -31,7 +31,7 @@ Before writing any code, determine:
 
 | Need | Component |
 |------|-----------|
-| Interact with an LLM, maintain session context | `Agent` |
+| Interact with an LLM, durable execution, multi-agent coordination | `Autonomous Agent` |
 | Long-running multi-step process with retries/compensation | `Workflow` |
 | Durable state with full event history (audit trail) | `EventSourcedEntity` |
 | Durable state, simple key-value, no history needed | `KeyValueEntity` |
@@ -42,8 +42,7 @@ Before writing any code, determine:
 | React to events from entities, workflows, or topics | `Consumer` |
 | Schedule future actions with delivery guarantees | `Timer` |
 
-**Golden Rule**: Agents do ONE thing. Orchestration belongs in Workflows, not Agents.
-Never have an Agent call another Agent directly.
+**Golden Rule**: Choose the right multi-agent coordination. Use Workflows when the sequence of steps is fixed in code. Use an Autonomous Agent when the model decides which agent runs next. Autonomous Agents can delegate subtasks, hand off work, lead teams, and moderate conversations using built-in capabilities exposed as tools.
 
 ---
 
@@ -95,7 +94,7 @@ public Effect<Done> createWallet(int initialBalance) {
 
 | Component | Effect API |
 |-----------|-----------|
-| Agent | `model()`, `systemMessage()`, `userMessage()`, `tools()`, `memory()`, `thenReply()`, `responseAs()` |
+| Autonomous Agent | `model()`, `systemMessage()`, `userMessage()`, `tools()`, `memory()`, `thenReply()`, `responseAs()` |
 | EventSourcedEntity | `persist(event)`, `thenReply()`, `error()`, `delete()` |
 | KeyValueEntity | `updateState()`, `deleteEntity()`, `thenReply()`, `error()`, `expireAfter()` |
 | Workflow | `updateState()`, `transitionTo()`, `thenReply()`, `thenPause()`, `thenEnd()`, `error()` |
@@ -105,9 +104,11 @@ public Effect<Done> createWallet(int initialBalance) {
 
 ---
 
-## 5. Agents
+## 5. Autonomous Agents
 
 ### Basic structure
+
+Autonomous Agents are AI model-driven components that run as durable processes. They work on typed tasks, each with its own identity, instructions, and result schema. State is persisted, so work survives crashes and restarts.
 
 ```java
 @Component(id = "my-agent")
@@ -138,7 +139,8 @@ akka.javasdk.agent {
 }
 ```
 
-Supported providers: `openai`, `anthropic`, `bedrock`, `googleaigemini`, `huggingface`, `localai`, `ollama`.
+Supported providers: `openai`, `azure`, `anthropic`, `bedrock`, `googleaigemini`, `vertexai`, `mistralai`, `huggingface`, `localai`, `ollama`.
+Models can be configured to enable thinking/reasoning, and agents support multimodal (image) inputs. Prompt caching is supported for Anthropic and Bedrock.
 
 ### Structured responses
 
@@ -227,33 +229,26 @@ private String getCurrentDate() {
 }
 ```
 
-### Calling agents from Workflows (correct pattern)
+### Autonomous Multi-Agent Coordination
 
-```java
-// In a Workflow step — CORRECT
-@StepName("get-weather")
-private StepEffect getWeatherStep() {
-    var forecast = componentClient
-        .forAgent()
-        .inSession(sessionId())
-        .method(WeatherAgent::query)
-        .invoke(currentState().userQuery());
+Autonomous Agents have built-in capabilities for multi-agent coordination exposed as tools. Without manual orchestration code, they can:
+- Delegate subtasks to specialist workers
+- Hand off work to a peer
+- Lead a team that shares a task list
+- Moderate a turn-taking conversation
 
-    return stepEffects()
-        .updateState(currentState().withForecast(forecast))
-        .thenTransitionTo(MyWorkflow::nextStep);
-}
+When the flow is dynamic and determined by the model, use Autonomous Agents.
 
-// NEVER call agents from other agents directly
-// NEVER: componentClient.forAgent().method(OtherAgent::query).invoke(...)
-// from inside an Agent class
-```
+### Calling agents from Workflows
+
+Use Workflows to call agents only when the sequence of steps is deterministic and fixed.
 
 ---
 
 ## 6. Workflows
 
 ### Structure and settings
+Workflows have a fluent API that makes defining multi-step processes intuitive. Workflows can also emit streams of real-time notifications to subscribers to keep downstream systems informed as steps progress.
 
 ```java
 @Component(id = "transfer")
@@ -372,6 +367,13 @@ public class WalletEntity extends EventSourcedEntity<Wallet, WalletEvent> {
         return effects().reply(currentState().balance());
     }
 
+    // TTL-based expiry — delete entity automatically after duration
+    public Effect<Done> expireOldAccount() {
+        return effects()
+            .expireAfter(Duration.ofDays(365))
+            .thenReply(__ -> done());
+    }
+
     // Event handler — rebuilds state from events (must be pure, no side effects)
     @Override
     public Wallet applyEvent(WalletEvent event) {
@@ -438,6 +440,8 @@ public class CounterEntity extends KeyValueEntity<Counter> {
 ---
 
 ## 9. Views
+
+Views and consumers can be configured to start from a snapshot instead of replaying the full event history. This significantly reduces startup time and resource usage for components that subscribe to high-volume event streams.
 
 ```java
 @Component(id = "customers-by-name")
@@ -546,6 +550,8 @@ public HttpResponse streamCustomers(String city) {
 
 ## 11. Consumers (Event-Driven)
 
+Like Views, Consumers can be configured to start from snapshots instead of replaying the full event history.
+
 ```java
 @Component(id = "order-processor")
 @Consume.FromEventSourcedEntity(OrderEntity.class)
@@ -588,10 +594,24 @@ public class OrderPublisher extends Consumer {
 
 ## 12. Multi-Agent Orchestration — Patterns
 
-### Allowed patterns (use these)
+Akka supports two distinct approaches to multi-agent orchestration. Choose the right one based on whether the flow is deterministic or dynamic.
+
+### 1. Autonomous Agent Coordination (Dynamic)
+
+When the sequence of steps is dynamic and decided by the AI model, use an Autonomous Agent. Autonomous Agents have built-in multi-agent coordination capabilities exposed as tools. You do not need to write orchestration code.
+
+Capabilities:
+- **Delegate**: Assign a subtask to a specialist worker agent.
+- **Hand-off**: Transfer work to a peer agent.
+- **Lead Team**: Manage a team that shares a task list.
+- **Moderate**: Moderate a turn-taking conversation among agents.
+
+### 2. Workflow Orchestration (Deterministic)
+
+When the sequence of steps is fixed in code, use a Workflow to call Autonomous Agents.
 
 ```
-Workflow → Agent(s)           ← sequential or parallel orchestration
+Workflow → Agent(s)           ← sequential or parallel deterministic orchestration
 Workflow → A2A/ACP → Agents   ← external agent protocols
 Agent → Endpoint (HTTP/gRPC)  ← calling external services
 Broker → Consumer → Agent     ← event-triggered agents
@@ -600,47 +620,8 @@ Broker → Consumer → Agent     ← event-triggered agents
 ### Forbidden patterns (never use)
 
 ```
-Agent → Agent directly         ← breaks composability and resilience
 Agent → MCP Server → Agent    ← creates hidden coupling
 Endpoint → Endpoint directly  ← bypasses durable execution
-```
-
-### Dynamic orchestration (planner pattern)
-
-```java
-// 1. SelectorAgent — picks which agents to use
-// 2. PlannerAgent — decides order and tailored queries
-// 3. Workflow — executes the plan durably
-
-// Dynamic agent call (when agent class is unknown at compile time)
-DynamicMethodRef<AgentRequest, String> call = componentClient
-    .forAgent()
-    .inSession(sessionId())
-    .dynamicCall(agentId);  // agentId from plan
-String result = call.invoke(request);
-```
-
-### AgentRegistry for discovery
-
-```java
-@Component(id = "selector-agent")
-public class SelectorAgent extends Agent {
-    private final String systemMessage;
-
-    public SelectorAgent(AgentRegistry registry) {
-        var workers = registry.agentsWithRole("worker");
-        this.systemMessage = """
-            Available agents: %s
-            Select which agents to use...
-            """.formatted(JsonSupport.encodeToString(workers));
-    }
-}
-
-// Agent registration
-@Component(id = "weather-agent", name = "Weather Agent",
-           description = "Provides weather forecasts and conditions.")
-@AgentRole("worker")
-public class WeatherAgent extends Agent { ... }
 ```
 
 ---
@@ -763,8 +744,8 @@ public void testOrderProcessing() {
 ### Architecture
 - Domain classes have **zero** Akka imports.
 - Endpoints never call domain layer directly — always via ComponentClient.
-- Agents do **one** thing — no orchestration logic inside Agent classes.
-- Workflows own orchestration, retries, compensation, and state transitions.
+- Workflows own deterministic orchestration, retries, compensation, and state transitions.
+- Autonomous Agents own dynamic multi-agent orchestration via built-in capabilities.
 
 ### Entities
 - Always override `emptyState()`.
@@ -795,16 +776,16 @@ public void testOrderProcessing() {
 
 | Question | Answer |
 |----------|--------|
-| Single LLM task, no orchestration | `Agent` alone |
-| Multiple LLM tasks in sequence | `Workflow` orchestrating multiple `Agent`s |
+| Single LLM task | `Autonomous Agent` alone |
+| Multiple LLM tasks in a fixed sequence | `Workflow` orchestrating `Autonomous Agent`s |
 | Need retry / compensation / durable execution | Always `Workflow` |
 | Audit trail of all state changes required | `EventSourcedEntity` |
 | Simple state, no history needed | `KeyValueEntity` |
 | Query multiple entities by attribute | `View` |
 | React to entity changes asynchronously | `Consumer` |
-| AI with access to domain state | `Agent` + `ComponentClient` + Entity/View as tools |
+| AI with access to domain state | `Autonomous Agent` + `ComponentClient` + Entity/View as tools |
 | Human approval checkpoint | `Workflow` with `thenPause()` |
-| Dynamic agent selection at runtime | `Workflow` + `AgentRegistry` + `dynamicCall()` |
+| Dynamic multi-agent coordination | `Autonomous Agent` using delegate/handoff/lead capabilities |
 | Stream LLM tokens to browser | `StreamEffect` in Agent + SSE in Endpoint |
 | New feature from scratch | Use SDD: `/akka:specify` → `/akka:plan` → `/akka:implement` |
 | Millions of events/sec from Kafka | `Consumer` + `@Consume.FromTopic` + idempotent entity writes |

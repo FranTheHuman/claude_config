@@ -1,0 +1,154 @@
+================================================================================
+  QUARKUS AGENT — RESUMEN COMPLETO DE CONFIGURACIÓN
+================================================================================
+
+QUÉ SE CONSTRUYÓ
+────────────────
+Un agente especialista en Quarkus reactivo para Claude Code, compuesto por
+tres piezas que trabajan juntas:
+
+  1. SKILL          ~/.claude/skills/quarkus-expert/SKILL.md
+                    El conocimiento técnico completo: Mutiny, Hibernate Reactive,
+                    Panache, datasources, Event Bus, Kafka, Stork, Infinispan,
+                    reglas de threading, transacciones, testing y arquitectura.
+
+  2. SUB-AGENTE     ~/.claude/agents/quarkus-master.md
+                    El comportamiento: cómo clasifica pedidos, qué hace con cada
+                    uno, hard rules que nunca viola, formato de respuesta.
+                    Precarga el skill automáticamente al arrancar (campo skills:).
+
+  3. COMANDOS       ~/.claude/commands/quarkus/
+                    Tareas estructuradas invocables con /quarkus:comando.
+
+
+ESTRUCTURA DE ARCHIVOS FINAL
+─────────────────────────────
+~/.claude/
+├── agents/
+│   ├── akka-master.md                  ← tu agente previo, intacto
+│   └── quarkus-master.md               ← agente Quarkus (nuevo)
+├── commands/
+│   └── quarkus/
+│       ├── review.md                   ← /quarkus:review
+│       ├── new-entity.md               ← /quarkus:new-entity
+│       ├── new-endpoint.md             ← /quarkus:new-endpoint
+│       ├── explain.md                  ← /quarkus:explain
+│       └── diagnose.md                 ← /quarkus:diagnose
+└── skills/
+    └── quarkus-expert/
+        └── SKILL.md                    ← conocimiento técnico
+
+
+CÓMO FUNCIONA
+─────────────
+Cuando abrís Claude Code en cualquier proyecto:
+
+  · El sub-agente quarkus-master está disponible globalmente.
+  · Al invocarlo, carga el SKILL.md automáticamente en su propio
+    contexto window (no ensucia tu conversación principal).
+  · Los comandos /quarkus:* pueden invocarse desde cualquier proyecto.
+  · Tu akka-master sigue funcionando exactamente igual que antes.
+
+
+CÓMO INVOCAR — FORMAS DE USO
+──────────────────────────────
+
+1. LENGUAJE NATURAL (Claude decide si delegar)
+   ─────────────────────────────────────────────
+   "Use the quarkus-master agent to create a Book entity"
+   "Usa el agente quarkus-master para revisar BookResource.java"
+
+2. @-MENTION (garantiza que use ese sub-agente)
+   ──────────────────────────────────────────────
+   @"quarkus-master (agent)" crea una entidad Product con name y price
+   @"quarkus-master (agent)" revisa src/main/java/org/acme/BookResource.java
+
+3. COMANDOS ESTRUCTURADOS /quarkus:*
+   ────────────────────────────────────
+
+   /quarkus:review
+   → Revisa código Quarkus. Reporta CRITICAL / WARNING / SUGGESTION.
+     Uso: /quarkus:review
+          /quarkus:review src/main/java/org/acme/BookResource.java
+          /quarkus:review src/main/java/org/acme/
+
+   /quarkus:new-entity
+   → Genera entidad Panache + repository + queries comunes + migración SQL.
+     Uso: /quarkus:new-entity Book title:String author:String published:LocalDate
+          /quarkus:new-entity Order --pattern active
+          /quarkus:new-entity Product name:String price:BigDecimal --pattern repository
+
+   /quarkus:new-endpoint
+   → Genera REST endpoint reactivo (Uni<T>) con CRUD completo o parcial.
+     Uso: /quarkus:new-endpoint Book
+          /quarkus:new-endpoint Book --ops get,list
+          /quarkus:new-endpoint Order --path /api/v2/orders --no-test
+
+   /quarkus:explain
+   → Explica un concepto, API, anotación o archivo del proyecto.
+     Uso: /quarkus:explain Uni
+          /quarkus:explain @WithTransaction
+          /quarkus:explain chain vs transformToUni
+          /quarkus:explain @Blocking
+          /quarkus:explain src/main/java/org/acme/BookResource.java
+
+   /quarkus:diagnose
+   → Diagnostica un error o comportamiento inesperado.
+     Uso: /quarkus:diagnose
+          /quarkus:diagnose No current Mutiny.Session found
+          /quarkus:diagnose BlockingOperationNotAllowedException
+          /quarkus:diagnose mi endpoint devuelve 200 pero no guarda nada
+
+4. SESIÓN COMPLETA COMO QUARKUS-MASTER
+   ──────────────────────────────────────
+   claude --agent quarkus-master
+   → Toda la sesión corre bajo el agente Quarkus.
+     Útil cuando vas a trabajar exclusivamente en un proyecto Quarkus.
+
+
+CASOS DE USO RÁPIDOS
+─────────────────────
+
+  Crear entidad + endpoint completo:
+    /quarkus:new-entity Product name:String price:BigDecimal stock:int
+    /quarkus:new-endpoint Product
+
+  Revisar todo un paquete antes de un PR:
+    /quarkus:review src/main/java/org/acme/
+
+  Entender un error de sesión:
+    /quarkus:diagnose No current Mutiny.Session found
+
+  Entender cuándo usar Uni vs Multi:
+    /quarkus:explain Uni vs Multi
+
+  Revisar si el threading está bien:
+    @"quarkus-master (agent)" revisa si este código bloquea el I/O thread
+
+
+LO QUE EL AGENTE NUNCA HACE (hard rules)
+──────────────────────────────────────────
+  · Nunca bloquea el I/O thread sin @Blocking
+  · Nunca mezcla Hibernate ORM con Hibernate Reactive
+  · Nunca genera código sin retornar el Uni/Multi
+  · Nunca genera escrituras a DB sin @WithTransaction
+  · Nunca mezcla @Transactional con @WithTransaction/@WithSession
+  · Nunca usa listAll() en tablas sin límite de paginación
+  · Nunca importa io.quarkus.hibernate.orm.panache en lugar del reactive
+
+
+VERIFICAR QUE TODO ESTÁ OK
+────────────────────────────
+  claude           → abrir Claude Code
+  /agents          → debe listar quarkus-master y akka-master
+  /quarkus:explain Uni   → responde con conocimiento del skill
+
+
+AGREGAR OTRO AGENTE EN EL FUTURO (ej: akka)
+─────────────────────────────────────────────
+  mkdir ~/.claude/commands/akka/
+  # crear archivos review.md, etc. → se exponen como /akka:review
+  # el skill correspondiente va en ~/.claude/skills/akka/SKILL.md
+  # el sub-agente va en ~/.claude/agents/akka-master.md (ya existe)
+
+================================================================================

@@ -9,24 +9,37 @@ Personal Claude Code configuration: sub-agents, skills, and slash commands.
 ├── agents/                  # Sub-agent definitions
 │   ├── akka-master.md
 │   ├── fe-master.md
+│   ├── minio-master.md
+│   ├── nginx-master.md
 │   ├── nodejs-master.md
 │   ├── quarkus-master.md
-│   └── react-master.md
+│   ├── quine-master.md
+│   ├── react-master.md
+│   └── tigerbeetle-master.md
 │
 ├── skills/                  # Knowledge bases loaded into agents and skills
 │   ├── akka-master/
 │   ├── fe-architecture/
+│   ├── minio-ops/
+│   ├── nginx-ops/
 │   ├── nodejs-best-practices/
 │   ├── quarkus-expert/
-│   └── react-best-practices/
+│   ├── quine-architecture/
+│   ├── react-best-practices/
+│   ├── tigerbeetle-java/
+│   └── tigerbeetle-ops/
 │
 └── commands/                # Slash commands grouped by domain
     ├── akka/                # /akka:review, /akka:specify, /akka:plan, /akka:new-component, /akka:diagnose, /akka:explain
     ├── fe/                  # /fe:review, /fe:architecture, /fe:ux-audit, /fe:explain, /fe:diagnose
     ├── git/                 # /git:commit, /git:commit-es
+    ├── minio/               # /minio:health, /minio:backup, /minio:migrate, /minio:sdk, /minio:diagnose
+    ├── nginx/               # /nginx:review, /nginx:setup, /nginx:harden, /nginx:add-service, /nginx:diagnose
     ├── nodejs/              # /nodejs:review, /nodejs:scaffold, /nodejs:new-feature, /nodejs:explain, /nodejs:diagnose
     ├── quarkus/             # /quarkus:review, /quarkus:new-endpoint, /quarkus:new-entity, /quarkus:explain, /quarkus:diagnose
-    └── react/               # /react:review, /react:scaffold, /react:new-feature, /react:explain, /react:diagnose
+    ├── quine/               # /quine:review, /quine:design, /quine:model, /quine:standing-query, /quine:deploy
+    ├── react/               # /react:review, /react:scaffold, /react:new-feature, /react:explain, /react:diagnose
+    └── tb/                  # /tb:review, /tb:scaffold, /tb:model, /tb:recipe, /tb:explain
 ```
 
 ## How it works
@@ -74,7 +87,10 @@ cp -r commands/* ~/.claude/commands/
 ```
 
 > Tip: you can alias this in your shell:
-> `alias claude-sync="cd ~/Desktop/PERSONAL/claude_config && git pull && cp -r agents/* ~/.claude/agents/ && cp -r skills/* ~/.claude/skills/ && cp -r commands/* ~/.claude/commands/"`
+> ```bash
+> alias claude-sync="cd ~/Desktop/PERSONAL/claude_config && git pull \
+>   && cp -r agents/* ~/.claude/agents/ && cp -r skills/* ~/.claude/skills/ && cp -r commands/* ~/.claude/commands/"
+> ```
 
 ---
 
@@ -197,9 +213,13 @@ git push origin main
 |-------|-----------|
 | `akka-master` | Akka Agentic Platform SDK — Agents, Workflows, Entities, Views, SDD |
 | `fe-master` | Frontend architecture, UX/UI, design systems, Core Web Vitals |
+| `minio-master` | MinIO on VPS — health, buckets, access control, SDK integration, migration |
+| `nginx-master` | Nginx reverse proxy — TLS, hardening, rate limiting, Fail2ban, troubleshooting |
 | `nodejs-master` | Node.js / Express APIs, async patterns, validation, Docker |
 | `quarkus-master` | Quarkus reactive stack — Mutiny, Panache, Kafka, GraalVM |
+| `quine-master` | Quine streaming graph database — standing queries, ingest, JSON-to-graph modeling |
 | `react-master` | React 19 — App Router, Server Components, hooks, TanStack |
+| `tigerbeetle-master` | TigerBeetle financial accounting database — data modeling, recipes, Java SDK, ops |
 
 ## Current skills
 
@@ -207,6 +227,26 @@ git push origin main
 |-------|--------|
 | `akka-master` | Akka SDK components, SDD workflow, testing, deployment |
 | `fe-architecture` | Rendering strategies, atomic design, accessibility, conversion UX |
+| `minio-ops` | MinIO operations, bucket policies, S3 SDK, backup, migration signals |
+| `nginx-ops` | Hardened Nginx config, TLS 1.2/1.3, security headers, rate limiting, CVE tracking |
 | `nodejs-best-practices` | Express, Zod, Pino, Jest, security middleware |
 | `quarkus-expert` | Mutiny, Hibernate Reactive, Panache, Kafka/Pulsar |
+| `quine-architecture` | Quine architecture, Three-Part System design, ID strategies, idempotency |
 | `react-best-practices` | React 19 APIs, Zustand, TanStack Query, React Compiler |
+| `tigerbeetle-java` | TigerBeetle Java SDK best practices, batches, error handling |
+| `tigerbeetle-ops` | TigerBeetle cluster setup, replication, troubleshooting |
+
+## Current commands
+
+| Domain | Commands |
+|--------|----------|
+| `akka` | `/akka:review`, `/akka:specify`, `/akka:plan`, `/akka:new-component`, `/akka:explain`, `/akka:diagnose` |
+| `fe` | `/fe:review`, `/fe:architecture`, `/fe:ux-audit`, `/fe:explain`, `/fe:diagnose` |
+| `git` | `/git:commit`, `/git:commit-es` |
+| `minio` | `/minio:health`, `/minio:backup`, `/minio:migrate`, `/minio:sdk`, `/minio:diagnose` |
+| `nginx` | `/nginx:review`, `/nginx:setup`, `/nginx:harden`, `/nginx:add-service`, `/nginx:diagnose` |
+| `nodejs` | `/nodejs:review`, `/nodejs:scaffold`, `/nodejs:new-feature`, `/nodejs:explain`, `/nodejs:diagnose` |
+| `quarkus` | `/quarkus:review`, `/quarkus:new-endpoint`, `/quarkus:new-entity`, `/quarkus:explain`, `/quarkus:diagnose` |
+| `quine` | `/quine:review`, `/quine:design`, `/quine:model`, `/quine:standing-query`, `/quine:deploy` |
+| `react` | `/react:review`, `/react:scaffold`, `/react:new-feature`, `/react:explain`, `/react:diagnose` |
+| `tb` | `/tb:review`, `/tb:scaffold`, `/tb:model`, `/tb:recipe`, `/tb:explain` |

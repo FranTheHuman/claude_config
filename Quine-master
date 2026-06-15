@@ -1,0 +1,324 @@
+================================================================================
+  QUINE MASTER — RESUMEN COMPLETO DE CONFIGURACIÓN
+================================================================================
+
+QUÉ SE CONSTRUYÓ
+────────────────
+Un sub-agente arquitecto de software especializado en Quine (streaming graph
+interpreter), pensado para diseñar sistemas NUEVOS de detección de patrones en
+tiempo real sobre streams de eventos, compuesto por tres piezas:
+
+  1. SKILL          ~/.claude/skills/quine-architecture/SKILL.md
+                    941 líneas de conocimiento técnico: metodología de diseño
+                    Three-Part System, traducción JSON-a-grafo, estrategia de
+                    IDs con idFrom, filosofía "all nodes exist", diseño de
+                    standing queries (4 patrones), ingest queries e
+                    idempotencia, supernodes, performance, garantías de entrega,
+                    deployment/persistors, recipes, REST API, ejemplo completo
+                    de detección de fraude, decision guide y anti-patterns.
+
+  2. SUB-AGENTE     ~/.claude/agents/quine-master.md
+                    191 líneas de comportamiento: 7 ramas de routing, 8 hard
+                    rules, formato de respuesta. Precarga el skill automáticamente.
+
+  3. COMANDOS       ~/.claude/commands/quine/
+                    5 comandos con prefijo /quine:* disponibles globalmente.
+
+
+ESTRUCTURA DE ARCHIVOS
+───────────────────────
+~/.claude/
+├── agents/
+│   └── quine-master.md             ← sub-agente Quine (color: pink)
+├── commands/
+│   └── quine/
+│       ├── design.md               ← /quine:design
+│       ├── model.md                ← /quine:model
+│       ├── standing-query.md       ← /quine:standing-query
+│       ├── review.md               ← /quine:review
+│       └── deploy.md               ← /quine:deploy
+└── skills/
+    └── quine-architecture/
+        └── SKILL.md
+
+
+INSTALACIÓN
+────────────
+  mkdir -p ~/.claude/skills/quine-architecture ~/.claude/commands/quine
+  cp quine-master.md ~/.claude/agents/
+  cp SKILL.md ~/.claude/skills/quine-architecture/
+  cp commands/quine/*.md ~/.claude/commands/quine/
+
+  claude
+  /agents   # debe aparecer quine-master
+  /help     # debe listar /quine:*
+
+
+QUÉ CUBRE EL SKILL (16 SECCIONES)
+───────────────────────────────────
+  §1   Architecture context — dónde encaja Quine respecto a TigerBeetle
+       (system of record) y PostgreSQL (master data); integración concreta
+       vía CDC de TigerBeetle (AMQP) → ingest → standing query → webhook;
+       nota sobre Cypher vs Gremlin (deprecado) y el modelo actor/Akka interno
+  §2   The Three-Part System — LA metodología central: Standing Query define
+       Graph Shape, que es creado por Ingest Query. Template de sesión de
+       diseño en 6 pasos, siempre en ese orden
+  §3   JSON to Graph Translation — tabla de decisión (objeto con identidad →
+       nodo, escalar → property, relación → edge, categórico de alta
+       cardinalidad → property no edge) con ejemplo de evento de pago
+  §4   ID Strategy — idFrom, prefijo por tipo, claves naturales y compuestas,
+       consistencia entre ingests (sin la cual hay nodos duplicados SIN error),
+       selección de ID provider (uuid/uuid-4/long/byte-array)
+  §5   "All Nodes Exist" — filosofía central: nunca verificar existencia,
+       solo MATCH+SET; implicaciones para multi-stream y para "contar" (caro)
+  §6   Standing Query Design — Distinct ID vs Multiple Values, decisión
+       emit-vs-update, y 4 patrones completos: detección directa, agregación
+       vía graph update, queries encadenadas/staged, patrones recursivos
+       (con advertencia de terminación obligatoria)
+  §7   Ingest Query Design — template estándar, anclaje con idFrom, manejo
+       de campos opcionales con coalesce, e idempotencia (el punto crítico:
+       int.add NO es idempotente bajo at-least-once)
+  §8   Supernodes — cuándo son problema (traversal FROM) vs seguros
+       (terminan ON), soluciones (property en vez de edge, particionado)
+  §9   Performance — full node scans (#1 causa de incidentes), balance de
+       paralelismo entre ingests, computar temprano, monitoreo de
+       shared.valve.ingest (backpressure)
+  §10  Delivery Guarantees — Ingest at-least-once / Standing Query outputs
+       best-effort; diseño para consumidores downstream (tratarlos como
+       notificaciones, no como hechos, ruteo por queue si se necesita garantía)
+  §11  Deployment — Docker/jar/source, selección de persistor (RocksDB
+       default vs Cassandra/ScyllaDB vs MapDB), resource planning (-Xmx,
+       in-memory-soft/hard-node-limit)
+  §12  Monitoring — dashboard, convenciones REST API v2, health checks
+       (/api/v2/system/readiness y /liveness), JMX
+  §13  Recipes — estructura YAML estándar, diferencias recipes vs API
+       (naming INGEST-#/STANDING-#, persistencia temporal vs producción)
+  §14  Worked Example — caso completo de fraude: "dispositivo envía a 5+
+       cuentas distintas en una ventana" recorriendo los 6 pasos del Three-
+       Part System, incluyendo el patrón "relationship as a node" para contar
+       sin duplicar en replays
+  §15  Architecture Decision Guide — tabla de decisiones para este contexto
+  §16  Anti-patterns — 12 errores en orden de severidad
+
+
+COMANDOS /quine:* — TABLA COMPLETA
+──────────────────────────────────
+
+  /quine:design <patrón a detectar>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    EL COMANDO INSIGNIA. Recorre las 6 etapas del Three-Part
+              System en orden, como pasos etiquetados: (1) la pregunta en
+              una frase, (2) el patrón de grafo en Cypher, (3) elección de
+              modo con justificación, (4) tabla de estructura del grafo con
+              idFrom por entidad, (5) ingest query completo con nota de
+              idempotencia, (6) standing query + output con destino.
+              NUNCA salta directo al ingest query aunque se lo pidan
+              explícitamente — si el dato no soporta el patrón, vuelve al
+              paso 2 y lo dice.
+  Ejemplos    /quine:design detect when a device sends transfers to 5+
+              distinct accounts within 10 minutes
+              /quine:design find users who log in from 3+ different
+              countries in a day
+              /quine:design alert when an order ships to a different
+              address than billing
+              /quine:design detect circular payment chains (A pays B pays
+              C pays A)
+
+  /quine:model <JSON> [for pattern: ...]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Mapea un esquema JSON a nodos/properties/edges. Si no hay un
+              standing query objetivo ya definido, lo pregunta primero —
+              porque mapear sin patrón es el error #1 (diseñar un grafo que
+              no puede expresar lo que necesitás). Para cada tipo de nodo,
+              especifica los argumentos exactos de idFrom (con prefijo de
+              tipo) y chequea colisiones. Si hay múltiples streams
+              referenciando la misma entidad, deja explícita la convención
+              de idFrom compartida.
+  Ejemplos    /quine:model {"orderId": "...", "customerId": "...", "items":
+              [...]} for pattern: customers who order from multiple categories
+              /quine:model TigerBeetle CDC transfer event for pattern: device
+              sends to 5+ distinct accounts
+              /quine:model {"userId": "...", "loginIp": "...", "country":
+              "..."} for pattern: users logging in from multiple countries
+
+  /quine:standing-query <objetivo>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera pattern + output completos. Por defecto Distinct ID —
+              solo cambia a Multiple Values si necesita valores por match o
+              WHERE sobre propiedad computada, y dice por qué. Para
+              objetivos de conteo/agregación, chequea la trampa de
+              idempotencia (int.add por replay) y propone la alternativa
+              "relationship as a node" del worked example, o acepta conteos
+              aproximados explícitamente. En patrones recursivos, la
+              condición de terminación es obligatoria y se genera siempre.
+  Catálogo    Direct pattern detection / Aggregation via graph update /
+              Chained-staged queries / Recursive propagation
+  Ejemplos    /quine:standing-query alert when an order ships to a different
+              address than billing
+              /quine:standing-query count distinct destination accounts per
+              device
+              /quine:standing-query flag devices after they exceed 5 distinct
+              destination accounts
+              /quine:standing-query propagate a "tainted" flag along
+              transaction paths
+              /quine:standing-query find users connected to a known-bad IP
+
+  /quine:review [path o Cypher/YAML pegado]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Audita ingest queries, standing queries o recipes YAML.
+              Primer chequeo siempre: MATCH sin idFrom (full node scan),
+              idFrom inconsistente para el mismo tipo de nodo entre
+              archivos/streams (busca otros idFrom con el mismo prefijo y
+              compara argumentos), contadores int.add no idempotentes,
+              "existence checks" que violan all-nodes-exist, supernodes sin
+              justificación, recursión sin condición de terminación, y
+              CUALQUIER property que debería estar en TigerBeetle en vez de
+              en Quine.
+  Veredicto   ✅ Approved / ⚠️ Approved with warnings / ❌ Blocked
+              (Blocked = comportamiento incorrecto silencioso en producción)
+  Ejemplos    /quine:review recipes/fraud-detection.yaml
+              /quine:review  → seguido de pegar una ingest query
+              /quine:review  → seguido de pegar pattern + output de una
+              standing query
+
+  /quine:deploy [dev|prod] [detalles de volumen/HA]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera el service de Docker Compose siguiendo las convenciones
+              de tu VPS actual (puertos loopback salvo exposición explícita,
+              memory limits, json-file logging, healthcheck con
+              /api/v2/system/readiness y /liveness), sizing de -Xmx e
+              in-memory-soft/hard-node-limit según el volumen descrito, y
+              recipe YAML completo para desarrollo. Por defecto RocksDB en
+              el mismo VPS — si pedís Cassandra sin justificar HA/escala,
+              pregunta qué la motiva antes de generar un setup multi-servicio.
+  Ejemplos    /quine:deploy dev → recipe local, RocksDB, single instance
+              /quine:deploy prod low volume, same VPS as the rest of the stack
+              /quine:deploy prod high availability required, multi-region
+              /quine:deploy resource sizing for ~10k events/sec ingest
+
+
+ROUTING DEL AGENTE — 7 RAMAS
+──────────────────────────────
+  Three-Part System Design  → "design a Quine system for", "detect when",
+                              "I want to find patterns where", "new ingest +
+                              standing query for"
+  Data Modeling              → "how should I model", "node or property",
+                              "what should be an edge", "idFrom strategy"
+  Standing Query Patterns    → "standing query", "Distinct ID", "Multiple
+                              Values", "chain queries", "recursive pattern",
+                              "emit vs update", "count distinct"
+  Performance/Troubleshooting → "slow", "full node scan", "supernode",
+                              "backpressure", "OOM", "queue overflow"
+  Deployment/Operations       → "deploy Quine", "Docker", "persistor",
+                              "RocksDB", "Cassandra", "recipe", "monitoring"
+  Architecture/Integration    → "where does Quine fit", "TigerBeetle CDC",
+                              "do I need Quine", "is this the right tool"
+  Review                      → "review this Cypher", "review this recipe",
+                              "check this ingest query"
+
+
+HARD RULES — NUNCA VIOLA ESTAS 8
+──────────────────────────────────
+  1. Nunca diseñar/generar ingest query antes que el standing query pattern
+     esté definido — el patrón determina la forma del grafo            [CRITICAL]
+  2. Nunca MATCH (n) WHERE n.property = valor sin id(n) = idFrom(...)
+     en ingest o ad-hoc (standing query patterns exentos)               [CRITICAL]
+  3. Nunca modelar un valor categórico de alta cardinalidad como nodo
+     con edges desde muchas entidades sin justificación — property en
+     vez de edge (causa #1 de supernodes)
+  4. Nunca permitir idFrom inconsistente para la misma entidad lógica
+     entre distintos ingest streams — sin error visible, solo nodos
+     duplicados silenciosos                                             [CRITICAL]
+  5. Nunca generar ingest query no idempotente (ej. int.add por record)
+     sin señalar el riesgo de replay at-least-once y la alternativa
+     "relationship as a node"
+  6. Nunca presentar la entrega de standing query output como
+     garantizada — es best-effort, sugerir queue si no tolera pérdidas
+  7. Nunca chequear "existe este nodo" antes de referenciarlo — all
+     nodes exist by convention, siempre MATCH + SET
+  8. Nunca poner balances financieros o estado que requiera
+     serializabilidad estricta en el grafo de Quine — eso es
+     TigerBeetle (system of record); Quine es grafo derivado            [CRITICAL]
+
+
+ANÁLISIS — QUÉ LO HACE DIFERENTE A LOS OTROS AGENTES
+────────────────────────────────────────────────────
+  INVIERTE EL ORDEN DE TRABAJO A PROPÓSITO:
+  minio-master, nginx-master y tigerbeetle-master generan código a partir
+  de requisitos conocidos — vas, pedís el código, lo tenés. quine-master
+  hace lo opuesto: la hard rule #1 prohíbe generar la ingest query antes
+  de que el standing query pattern esté definido. La razón es que en
+  Quine un grafo con la forma incorrecta no da error — el standing query
+  simplemente nunca matchea, para siempre, en silencio. /quine:design
+  fuerza ese orden incluso si pedís directamente "la ingest query".
+
+  CONECTA CON TIGERBEETLE SIN PISARLO:
+  La sección 1 del skill define el patrón de integración concreto: CDC de
+  TigerBeetle (AMQP) → ingest de Quine → standing query → webhook a tu API
+  Node.js. Quine nunca lee ni escribe el ledger directamente — construye
+  un grafo derivado de relaciones para detectar patrones (fraude,
+  anomalías) que serían carísimos de expresar en SQL o en TigerBeetle. La
+  hard rule #8 frena explícitamente la tentación de usar Quine como base
+  de datos transaccional.
+
+  LA TRAMPA DE IDEMPOTENCIA TIENE EL MISMO ADN QUE EN TIGERBEETLE, FORMA
+  DISTINTA:
+  En TigerBeetle, Exists vs ExistsWithDifferent* es el problema central.
+  En Quine, es CALL int.add(node, "counter", 1) ejecutado una vez por
+  evento — con at-least-once delivery, un replay duplica el conteo
+  silenciosamente. La solución (worked example, §14) es modelar "el hecho
+  de la relación" como su propio nodo con idFrom compuesto: un replay
+  resuelve al mismo nodo, no duplica nada. Es el mismo principio que
+  "leer tb_account_id de vuelta de Postgres en vez de generar uno nuevo"
+  — convertir la operación en un MATCH+SET sobre un ID determinístico.
+
+  idFrom ES EL EQUIVALENTE DE UInt128.id(), PERO SIN RED DE SEGURIDAD:
+  IDs inconsistentes en TigerBeetle generan errores claros
+  (ExistsWithDifferentLedger, etc.). idFrom("account", id) vs
+  idFrom("acct", id) desde dos ingests distintos crea DOS NODOS para la
+  misma entidad lógica sin ningún error — el standing query simplemente
+  no matchea nunca. Por eso la hard rule #4 pide documentar la convención
+  de IDs centralizadamente, con el mismo rigor que LedgerCodes/
+  AccountCodes en tigerbeetle-java, y /quine:model la pregunta
+  explícitamente cuando hay múltiples streams.
+
+  "ALL NODES EXIST" ES UN CAMBIO MENTAL, NO SOLO TÉCNICO:
+  Viniendo de Postgres/TigerBeetle (donde "crear" es una operación
+  explícita con su propio manejo de errores), la idea de que CADA nodo ya
+  existe y solo se "direcciona" elimina toda una clase de código
+  (existence checks, create-if-not-exists). El agente lo aplica como hard
+  rule #7 — cualquier OPTIONAL MATCH + IS NULL para decidir si "crear"
+  algo es una bandera roja inmediata en /quine:review.
+
+
+CASOS DE USO RÁPIDOS
+─────────────────────
+  Diseñar un sistema nuevo de detección desde cero:
+    /quine:design detect when a device sends transfers to 5+ distinct
+    accounts within 10 minutes
+
+  Mapear un evento CDC de TigerBeetle a grafo:
+    /quine:model TigerBeetle CDC transfer event for pattern: device sends
+    to 5+ distinct accounts
+
+  Generar solo la standing query para un objetivo ya modelado:
+    /quine:standing-query flag devices after they exceed 5 distinct
+    destination accounts
+
+  Revisar una recipe antes de desplegarla:
+    /quine:review recipes/fraud-detection.yaml
+
+  Preparar el deploy en el VPS existente:
+    /quine:deploy prod low volume, same VPS as the rest of the stack
+
+
+VERIFICAR INSTALACIÓN
+──────────────────────
+  claude
+  /agents   → debe listar quine-master junto a minio-master, nginx-master
+              y tigerbeetle-master
+  /help     → debe listar /quine:*
+  /quine:design detect when a device sends transfers to 5+ distinct
+  accounts within 10 minutes
+
+================================================================================

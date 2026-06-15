@@ -1,0 +1,263 @@
+================================================================================
+  TIGERBEETLE MASTER — RESUMEN COMPLETO DE CONFIGURACIÓN
+================================================================================
+
+QUÉ SE CONSTRUYÓ
+────────────────
+Un sub-agente especialista en construir aplicaciones Java sobre TigerBeetle
+(base de datos OLTP para contabilidad financiera de doble entrada), pensado
+para un proyecto NUEVO desde cero, compuesto por tres piezas:
+
+  1. SKILL          ~/.claude/skills/tigerbeetle-java/SKILL.md
+                    1224 líneas de conocimiento técnico: arquitectura OLTP/OLGP,
+                    setup Maven (Quarkus/Spring Boot/plano), ciclo de vida del
+                    cliente, generación de IDs e idempotencia, modelado de datos,
+                    accounts y transfers con batching, two-phase transfers,
+                    linked events, librería completa de recetas, manejo de
+                    errores, testing, deployment y monitoreo.
+
+  2. SUB-AGENTE     ~/.claude/agents/tigerbeetle-master.md
+                    159 líneas de comportamiento: 6 ramas de routing, 8 hard
+                    rules, formato de respuesta. Precarga el skill automáticamente.
+
+  3. COMANDOS       ~/.claude/commands/tb/
+                    5 comandos con prefijo /tb:* disponibles globalmente.
+
+
+ESTRUCTURA DE ARCHIVOS
+───────────────────────
+~/.claude/
+├── agents/
+│   └── tigerbeetle-master.md       ← sub-agente TigerBeetle (color: red)
+├── commands/
+│   └── tb/
+│       ├── scaffold.md             ← /tb:scaffold
+│       ├── model.md                ← /tb:model
+│       ├── recipe.md               ← /tb:recipe
+│       ├── review.md               ← /tb:review
+│       └── explain.md              ← /tb:explain
+└── skills/
+    └── tigerbeetle-java/
+        └── SKILL.md
+
+
+INSTALACIÓN
+────────────
+  mkdir -p ~/.claude/skills/tigerbeetle-java ~/.claude/commands/tb
+  cp tigerbeetle-master.md ~/.claude/agents/
+  cp SKILL.md ~/.claude/skills/tigerbeetle-java/
+  cp commands/tb/*.md ~/.claude/commands/tb/
+
+  claude
+  /agents   # debe aparecer tigerbeetle-master
+  /help     # debe listar /tb:*
+
+
+QUÉ CUBRE EL SKILL (16 SECCIONES)
+───────────────────────────────────
+  §1   Architecture context — dónde vive TigerBeetle vs PostgreSQL vs la app,
+       y la regla de oro: nunca lookups de metadata en el hot path de transfers
+  §2   Project setup — pom.xml, dependencia Maven, estructura de paquetes recomendada
+  §3   Client lifecycle — singleton thread-safe, CDI producer (Quarkus) y
+       @Bean (Spring Boot), configuración de addresses para 1 o 6 réplicas
+  §4   ID generation & idempotency — UInt128.id(), quién genera el ID,
+       patrón Created/Exists, reliable transaction submission end-to-end
+  §5   Data modeling — ledgers (asset scale), account codes, transfer codes,
+       user_data_128/64/32, todo como enums Java inmutables append-only
+  §6   Accounts — create/lookup batcheado, tabla de flags de cuenta
+  §7   Transfers — create batcheado con chunking a 8189, queries de historial
+  §8   Two-phase transfers — pending/post/void, reglas de timeout e ids nuevos
+  §9   Linked event chains — atomicidad, regla del último evento sin linked
+  §10  Recipes library — currency exchange, multi-debit/multi-credit, close
+       account, balance-conditional, balance bounds, correcting transfers,
+       rate limiting (leaky bucket) — todo en Java completo
+  §11  Error handling — precedencia de status codes, IdAlreadyFailed,
+       jerarquía de excepciones recomendada
+  §12  Testing strategy — modo --development, lifecycle JUnit 5 para
+       integration tests
+  §13  Deployment — systemd vs Docker, cluster de 6 réplicas en 3 sitios
+  §14  Monitoring — StatsD, métricas clave para alertar
+  §15  Architecture Decision Guide — tabla de decisiones para este contexto
+  §16  Anti-patterns — los 10 errores más caros, en orden de severidad
+
+
+COMANDOS /tb:* — TABLA COMPLETA
+──────────────────────────────────
+
+  /tb:scaffold [maven|quarkus|spring]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera el proyecto desde cero: dependencia Maven, clase de
+              configuración del cliente como singleton con shutdown correcto
+              (CDI producer en Quarkus, @Bean destroyMethod en Spring),
+              esqueletos vacíos de LedgerCodes/AccountCodes/TransferCodes,
+              AccountService y TransferService con batching e idempotencia
+              ya implementados, y el snippet de README para correr TigerBeetle
+              local en modo --development.
+  Ejemplos    /tb:scaffold            → pregunta el framework primero
+              /tb:scaffold quarkus    → CDI producer completo
+              /tb:scaffold spring     → @Configuration con destroyMethod
+              /tb:scaffold maven      → cliente plano con factory explícita
+
+  /tb:model <dominio>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Diseña el chart of accounts completo para un dominio de negocio:
+              tabla de ledgers con asset scale (decisión irreversible, la
+              flaggea explícitamente), tabla de account codes con sus flags
+              de balance, tabla de transfer codes, y recomendaciones de
+              user_data_128/64/32 para enlazar con PostgreSQL. Termina
+              generando las 3 clases Java de constantes listas para pegar.
+  Decisión    Asset scale no se puede cambiar después de tener datos en un
+              ledger — el comando pregunta y advierte antes de fijarla
+  Ejemplos    /tb:model multi-currency wallet app, users hold USD and EUR
+              /tb:model marketplace con buyers, sellers y fees de plataforma
+              /tb:model billing de uso de API — rate limiting por request y por MB
+              /tb:model pagos de ride-sharing con payout a drivers y comisión
+
+  /tb:recipe <nombre> [detalles del dominio]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera el código Java completo para una de 8 recetas de
+              contabilidad, partiendo siempre del patrón validado del skill
+              y adaptando solo nombres de cuentas/ledgers/códigos al dominio.
+              Verifica que la cadena linked esté bien cerrada (el último
+              evento nunca lleva el flag linked). Incluye explicación de
+              2-3 líneas sobre por qué la cadena funciona así.
+  Catálogo    two-phase / currency-exchange / split-payment (multi-debit-credit)
+              / close-account / balance-conditional / balance-bounds /
+              correcting-transfer / rate-limit
+  Ejemplos    /tb:recipe two-phase escrow hold para una orden de marketplace
+              /tb:recipe currency-exchange USD a ARS con spread de 0.5%
+              /tb:recipe split-payment fare de ride dividido entre driver y plataforma
+              /tb:recipe close-account cierre de cuenta al finalizar contrato
+              /tb:recipe balance-conditional transferir solo si el wallet tiene $50+
+              /tb:recipe rate-limit 100 requests por minuto por API key
+              /tb:recipe correcting-transfer revertir un refund incorrecto
+
+  /tb:review [path]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Audita código Java existente con CRITICAL/WARNING/SUGGESTION.
+              Primer chequeo siempre: loops que llaman createTransfers una
+              vez por item (en vez de batch). Después: IDs mal generados
+              (auto-increment, UUID random en vez de UInt128.id()), Exists
+              tratado como excepción, timestamps seteados manualmente,
+              reuso del id de un pending transfer en su post/void, cadenas
+              linked mal cerradas, metadata fetcheada de Postgres dentro del
+              método de creación de transfers.
+  Veredicto   ✅ Approved / ⚠️ Approved with warnings / ❌ Blocked
+              (Blocked = "no debe tocar dinero real hasta corregir")
+  Ejemplos    /tb:review src/main/java/com/yourapp/ledger/TransferService.java
+              /tb:review src/main/java/com/yourapp/ledger/  → todo el directorio
+
+  /tb:explain <concepto>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Explica conceptos de TigerBeetle / contabilidad de doble entrada
+              en términos simples. Si el proyecto ya tiene ledgers/account
+              codes definidos, usa ESOS ejemplos en vez de genéricos. Siempre
+              termina con el pitfall común si existe.
+  Ejemplos    /tb:explain por qué mi wallet es un liability y no un asset
+              /tb:explain qué significa Exists y por qué no es un error
+              /tb:explain cómo garantizan atomicidad los linked transfers
+              /tb:explain por qué no puedo cambiar el asset scale después
+              /tb:explain strict serializability vs lo que me da Postgres
+              /tb:explain cuándo debería expirar un pending transfer
+
+
+ROUTING DEL AGENTE — 6 RAMAS
+──────────────────────────────
+  Project Setup        → "new project", "set up TigerBeetle", "pom.xml",
+                          "Quarkus", "Spring Boot", "get started"
+  Data Modeling         → "model", "ledgers", "account codes", "chart of
+                          accounts", "design the schema"
+  Code Generation       → "create account", "create transfer", "AccountService",
+                          "TransferService", "write the code for"
+  Recipe Implementation  → "two-phase", "pending transfer", "currency exchange",
+                          "split payment", "rate limit", "linked transfers"
+  Architecture / Design  → "how should TigerBeetle fit", "TigerBeetle vs
+                          Postgres", "do I need TigerBeetle for"
+  Troubleshooting        → "error", "ExceedsCredits", "LinkedEventFailed",
+                          "exists", "IdAlreadyFailed"
+
+
+HARD RULES — NUNCA VIOLA ESTAS 8
+──────────────────────────────────
+  1. Nunca un loop con createAccounts/createTransfers por item — siempre
+     batch (chunked a 8189)                                          [CRITICAL]
+  2. Nunca auto-increment ni UUID random para Account.id/Transfer.id —
+     siempre UInt128.id()                                            [CRITICAL]
+  3. Nunca timestamp != 0 al crear, salvo flags.imported              [CRITICAL]
+  4. Nunca tratar Exists como error — es el caso de éxito idempotente [CRITICAL]
+  5. Nunca reusar el id de un pending transfer para su post/void —
+     siempre un id nuevo + pending_id de referencia
+  6. Nunca terminar un batch en un evento con flags.linked
+  7. Nunca fetch de metadata desde Postgres en el path de creación de transfers
+  8. Nunca sugerir modificar o eliminar un Transfer/Account — siempre una
+     nueva transferencia en sentido contrario
+
+
+ANÁLISIS — QUÉ LO HACE DIFERENTE A LOS OTROS AGENTES
+────────────────────────────────────────────────────
+  ES UN AGENTE DE ARQUITECTURA DE DOMINIO, NO DE INFRAESTRUCTURA:
+  minio-master y nginx-master operan sobre un VPS real con docker logs,
+  mc, nginx -t. tigerbeetle-master opera sobre decisiones de modelado que,
+  una vez tomadas, son básicamente irreversibles: ledgers, account codes,
+  y sobre todo asset scale. El comando /tb:model existe precisamente para
+  forzar esas decisiones ANTES de escribir código, no después.
+
+  EL BUG MÁS CARO ESTÁ EN LA HARD RULE #4:
+  Exists no es un error — es el resultado de un retry exitoso. Si el
+  código de alguien lo trata como excepción y reintenta con un id nuevo,
+  cada timeout de red se convierte en una transferencia duplicada. Es el
+  primer chequeo de /tb:review y está presente en TODO el código generado
+  por /tb:scaffold y /tb:recipe.
+
+  ASSET SCALE ES LA DECISIÓN SIN BOTÓN DE DESHACER:
+  Cambiar de escala 2 (centavos) a escala 4 (para soportar fracciones de
+  centavo) después de tener transfers en un ledger requiere crear un
+  ledger completamente nuevo y migrar todas las cuentas. /tb:model lo
+  flaggea como pregunta explícita antes de generar cualquier código.
+
+  LAS RECETAS SON PATRONES VALIDADOS, NO IMPROVISACIÓN:
+  Las cadenas linked (currency exchange, split payment, balance-conditional)
+  dependen de que la secuencia de transfers tenga exactamente la forma
+  correcta — un flag linked de más o de menos rompe la atomicidad o tira
+  LinkedEventChainOpen. /tb:recipe parte siempre del patrón del skill y
+  solo adapta nombres, nunca la estructura de la cadena.
+
+  INTEGRA CON TU STACK JAVA EXISTENTE:
+  /tb:scaffold soporta Quarkus (CDI) además de Spring Boot — coherente con
+  el quarkus-master que ya tenés en el ecosistema. Si el servicio de ledger
+  termina viviendo junto a tus otros servicios Quarkus, la inyección de
+  dependencias sigue el mismo patrón.
+
+  EXPLICA EN TÉRMINOS DE TU PROPIO MODELO:
+  /tb:explain no usa ejemplos genéricos de "cuenta A y cuenta B" si tu
+  proyecto ya tiene LedgerCodes/AccountCodes/TransferCodes definidos —
+  usa tus propios nombres de cuenta para que la explicación de débito/
+  crédito tenga sentido en tu dominio real.
+
+
+CASOS DE USO RÁPIDOS
+─────────────────────
+  Arrancar un proyecto nuevo con Quarkus:
+    /tb:scaffold quarkus
+
+  Diseñar el chart of accounts para una billetera multi-moneda:
+    /tb:model multi-currency wallet, USD and EUR balances per user
+
+  Generar el código de un hold de escrow:
+    /tb:recipe two-phase escrow hold for marketplace orders
+
+  Revisar el TransferService antes de ir a producción:
+    /tb:review src/main/java/com/yourapp/ledger/TransferService.java
+
+  Entender por qué Exists no es un error:
+    /tb:explain what does Exists mean and why isn't it an error
+
+
+VERIFICAR INSTALACIÓN
+──────────────────────
+  claude
+  /agents   → debe listar tigerbeetle-master junto a minio-master y nginx-master
+  /help     → debe listar /tb:*
+  /tb:explain strict serializability vs what Postgres gives me
+
+================================================================================

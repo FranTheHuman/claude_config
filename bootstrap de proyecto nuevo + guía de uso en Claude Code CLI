@@ -1,0 +1,239 @@
+# Prompt reutilizable: bootstrap de proyecto nuevo + guía de uso en Claude Code CLI
+
+## PARTE 1 — El prompt (copiar, completar los 2 campos, pegar en `claude`)
+
+Todo lo que está entre `<...>` es lo único que cambia entre proyectos. El resto
+de las instrucciones queda fijo.
+
+````markdown
+# Bootstrap de proyecto nuevo
+
+## 🎯 Completar antes de usar
+
+**Objetivo del proyecto**:
+<Describir en 1-3 frases qué hace el proyecto y para quién. Ej: "Servicio de
+detección de fraude en tiempo real para transferencias del ledger interno. Lo
+usa el equipo de riesgo para flaggear cuentas sospechosas antes de que el área
+de soporte las revise.">
+
+**Stack elegido (decisión arquitectónica)**:
+<Listar las tecnologías de la tabla de abajo que aplican. Ej: "Quarkus + Quine"
+o "Akka + TigerBeetle" o "Node.js + React + fe + Nginx">
+
+**Nombre del repo/proyecto** (opcional, si no lo indico preguntámelo):
+<...>
+
+**Aclaraciones adicionales** (opcional — cualquier decisión ya tomada que
+evite preguntas, ej: "el dual-write con Postgres va desde el día 1", "monorepo
+con pnpm workspaces", "deploy en el mismo VPS que ya tengo"):
+<...>
+
+---
+
+## 🤖 Instrucciones (no modificar)
+
+Sos un arquitecto de software inicializando este repositorio DESDE CERO, para
+que quede listo para empezar a aplicar funcionalidades. Trabajás dentro de un
+ecosistema de Claude Code ya configurado en `~/.claude/`, con 9 agentes
+especializados + sus skills + comandos. Usá esta tabla como mapa — si en algún
+momento dudás de si sigue vigente, confirmá listando `~/.claude/agents/` y
+`~/.claude/commands/`:
+
+| # | Tecnología | Agente | Skill | Comandos | 
+|---|---|---|---|---|
+| 1 | Quarkus (reactive) | `quarkus-master` | `quarkus-reactive` | `/quarkus:*` |
+| 2 | Akka SDK | `akka-master` | `akka-sdk` | `/akka:*` |
+| 3 | Node.js | `nodejs-master` | `nodejs-best-practices` | `/nodejs:*` |
+| 4 | React | `react-master` | `react-best-practices` | `/react:*` |
+| 5 | Frontend architecture/UX | `fe-master` | `fe-architecture` | `/fe:*` |
+| 6 | MinIO | `minio-master` | `minio-ops` | `/minio:*` |
+| 7 | Nginx | `nginx-master` | `nginx-ops` | `/nginx:*` |
+| 8 | TigerBeetle | `tigerbeetle-master` | `tigerbeetle-java` | `/tb:*` |
+| 9 | Quine | `quine-master` | `quine-architecture` | `/quine:*` |
+
+Seguí estos pasos EN ORDEN:
+
+### 1. Interpretar el stack
+A partir de "Stack elegido", identificá qué filas de la tabla aplican a este
+proyecto. El resto queda "fuera de alcance". Si el stack incluye algo que NO
+está en la tabla, decímelo explícitamente y preguntame cómo proceder — no
+inventes un agente/skill que no existe.
+
+### 2. Preguntar ANTES de construir
+No empieces a crear archivos todavía. Primero hacé las preguntas necesarias para
+resolver ambigüedades que cambiarían la arquitectura resultante. No preguntes lo
+que ya esté respondido en "Aclaraciones adicionales". Ejemplos de preguntas
+según el stack (usalas como guía, no como checklist fijo):
+
+- General: nombre del repo si no lo indiqué, gestor de paquetes/runtime y
+  versión, ¿monorepo o repos separados si hay 2+ stacks?
+- Si incluye **TigerBeetle**: ¿dual-write con PostgreSQL desde el día 1
+  (Write Last/Read First) o se agrega en una segunda etapa?
+- Si incluye **Quine**: ¿cuál es el primer patrón a detectar? Es necesario para
+  arrancar el Three-Part System (sin esto no se puede diseñar el grafo).
+- Si incluye **Nginx**: ¿hay dominio/TLS desde ya, o desarrollo local-only
+  por ahora?
+- Si incluye **React/Node/fe** junto con un backend: ¿en el mismo repo o en
+  repos separados? ¿de dónde consume la API?
+- Si incluye **MinIO**: ¿qué buckets/paths necesita el proyecto desde el día 1?
+
+Esperá mis respuestas antes de seguir.
+
+### 3. Crear la estructura del repo
+Para cada tecnología del stack, leé la skill correspondiente
+(`~/.claude/skills/<skill>/SKILL.md`) y aplicá sus convenciones para crear la
+estructura inicial: directorios, archivos de build/config, README por servicio.
+Si existe un comando `/<prefijo>:*` que genera scaffolding para esa tecnología
+(por ejemplo `/tb:scaffold`), usalo en vez de escribir la estructura a mano.
+
+### 4. Crear `.claude/CLAUDE.md` (Stack Declaration)
+Seguí este formato, completándolo con la info real del proyecto y manteniéndolo
+bajo ~150 líneas:
+
+```markdown
+# <nombre del proyecto>
+
+## Stack
+- <tecnología 1> — <rol en este proyecto>
+- <tecnología 2> — <rol en este proyecto>
+
+## Agentes primarios
+- <agente-1> — para <qué tipo de tarea>
+- <agente-2> — para <qué tipo de tarea>
+
+## Comandos relevantes
+- `/<prefijo1>:*` — <para qué>
+- `/<prefijo2>:*` — <para qué>
+
+## Fuera de alcance
+Este proyecto NO usa: <resto de la tabla>.
+Los agentes/skills correspondientes están deshabilitados en
+`.claude/settings.json`.
+
+## Convenciones del proyecto
+- Build/test: <comandos>
+- Estructura: <breve>
+```
+
+### 5. Crear `.claude/settings.json` (enforcement)
+`skillOverrides` con `"off"` para cada skill de la tabla que NO esté en el
+stack elegido, y `permissions.deny` con `"Agent(<agente>)"` para cada agente
+correspondiente a esas mismas filas.
+
+### 6. Resumen final
+Listá: estructura de carpetas creada, archivos de configuración generados
+(`.claude/CLAUDE.md`, `.claude/settings.json`, y cualquier otro), y 3-5
+próximos pasos concretos para empezar a desarrollar — incluyendo qué comando
+`/...` correr primero para la primera funcionalidad.
+
+### Reglas generales
+- No asumas el nombre del proyecto si no lo indiqué — preguntalo en el paso 2.
+- No avances al paso 3 sin haber recibido respuesta a las preguntas del paso 2.
+- Todo en el mismo idioma del "Objetivo del proyecto".
+````
+
+---
+
+## PARTE 2 — Cómo correrlo en Claude Code CLI, paso a paso
+
+Esto ya se puede hacer hoy, pegando el prompt completo en una sesión interactiva.
+No hace falta nada nuevo para la primera vez:
+
+```bash
+# 1. Carpeta vacía para el proyecto nuevo
+mkdir mi-proyecto-nuevo && cd mi-proyecto-nuevo
+git init
+
+# 2. Arrancar Claude Code
+claude
+```
+
+```text
+# 3. Pegar el prompt de la PARTE 1 con los campos ya completados
+#    (todo el bloque, incluyendo la tabla y las instrucciones)
+```
+
+```text
+# 4. Claude va a hacer preguntas (paso 2 del prompt) — respondelas
+#    en lenguaje natural, en el mismo chat
+```
+
+```text
+# 5. Claude crea la estructura, .claude/CLAUDE.md, .claude/settings.json,
+#    y corre los comandos /tb:scaffold, /quine:design, etc. que correspondan
+#    — esto sucede automáticamente, no necesitás invocarlos a mano
+```
+
+```bash
+# 6. Verificar lo que quedó configurado, dentro de la misma sesión
+/memory     # confirma que .claude/CLAUDE.md se cargó
+/agents     # confirma qué agentes quedaron habilitados/bloqueados
+/doctor     # chequea settings activos
+```
+
+```bash
+# 7. Salir y commitear
+git add -A
+git commit -m "chore: bootstrap del proyecto (stack + config Claude Code)"
+```
+
+A partir de acá, el repo queda con el stack declarado y vos arrancás a pedir
+funcionalidades directamente — Claude ya sabe en qué proyecto está y con qué
+agentes/skills cuenta.
+
+---
+
+## PARTE 3 (opcional) — Convertirlo en un comando propio `/project-init`
+
+Si vas a crear proyectos nuevos seguido, conviene empaquetar el prompt de la
+PARTE 1 como una **skill personal** con argumentos, para no tener que pegar el
+bloque completo cada vez.
+
+```bash
+mkdir -p ~/.claude/skills/project-init
+```
+
+`~/.claude/skills/project-init/SKILL.md`:
+
+```yaml
+---
+name: project-init
+description: Bootstrap de un proyecto nuevo desde cero según objetivo y stack declarado
+disable-model-invocation: true
+arguments: [objetivo, stack]
+---
+
+# Bootstrap de proyecto nuevo
+
+## Objetivo del proyecto
+$objetivo
+
+## Stack elegido (decisión arquitectónica)
+$stack
+
+---
+
+[... pegar acá TODO el bloque "🤖 Instrucciones (no modificar)" de la PARTE 1,
+tal cual, sin cambios — esa parte es fija y no depende de objetivo/stack ...]
+```
+
+Con esto, el flujo completo pasa a ser:
+
+```bash
+mkdir mi-proyecto-nuevo && cd mi-proyecto-nuevo
+git init
+claude
+```
+
+```text
+/project-init "Servicio de detección de fraude en tiempo real para transferencias del ledger" "Quarkus + Quine"
+```
+
+Claude arranca directo en el paso 2 (preguntas de aclaración) con el objetivo y
+stack ya cargados — mismo resultado que la PARTE 1, una sola línea para
+invocarlo. `disable-model-invocation: true` asegura que esto solo se dispara
+cuando lo pedís explícitamente con `/project-init`, nunca por iniciativa propia
+de Claude.
+
+Si querés, puedo armar este archivo completo ahora mismo y dejarlo listo para
+copiar a `~/.claude/skills/project-init/SKILL.md`.

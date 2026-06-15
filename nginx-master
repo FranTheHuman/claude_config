@@ -1,0 +1,258 @@
+================================================================================
+  NGINX MASTER — RESUMEN COMPLETO DE CONFIGURACIÓN
+================================================================================
+
+QUÉ SE CONSTRUYÓ
+────────────────
+Un sub-agente especialista en Nginx como reverse proxy de producción en VPS,
+compuesto por tres piezas:
+
+  1. SKILL          ~/.claude/skills/nginx-ops/SKILL.md
+                    641 líneas de conocimiento técnico: configuración hardened
+                    completa, TLS 1.2/1.3, security headers, rate limiting,
+                    routing para el stack shalapp, Let's Encrypt, Fail2ban,
+                    CVE-2026-42945, y plantilla de extensión por nuevo servicio.
+
+  2. SUB-AGENTE     ~/.claude/agents/nginx-master.md
+                    141 líneas de comportamiento: 6 ramas de routing, 8 hard
+                    rules, formato de respuesta. Precarga el skill automáticamente.
+
+  3. COMANDOS       ~/.claude/commands/nginx/
+                    5 comandos con prefijo /nginx:* disponibles globalmente.
+
+
+ESTRUCTURA DE ARCHIVOS
+───────────────────────
+~/.claude/
+├── agents/
+│   └── nginx-master.md             ← sub-agente Nginx (color: green)
+├── commands/
+│   └── nginx/
+│       ├── review.md               ← /nginx:review
+│       ├── setup.md                ← /nginx:setup
+│       ├── diagnose.md             ← /nginx:diagnose
+│       ├── add-service.md          ← /nginx:add-service
+│       └── harden.md               ← /nginx:harden
+└── skills/
+    └── nginx-ops/
+        └── SKILL.md
+
+
+INSTALACIÓN
+────────────
+  mkdir -p ~/.claude/skills/nginx-ops ~/.claude/commands/nginx
+  cp nginx-master.md ~/.claude/agents/
+  cp SKILL.md ~/.claude/skills/nginx-ops/
+  cp commands/nginx/*.md ~/.claude/commands/nginx/
+
+  claude
+  /agents   # debe aparecer nginx-master
+  /help     # debe listar /nginx:*
+
+
+QUÉ CUBRE EL SKILL (12 SECCIONES)
+───────────────────────────────────
+  §1   Deployment context — mapa completo del stack shalapp y qué expone qué
+  §2   Hardened base config — nginx.conf completo con buffer limits, timeouts
+  §3   TLS configuration — ssl-params.conf y security-headers.conf como snippets
+  §4   Service routing — 5 configs completas: redirect, API, web, backoffice, MinIO
+  §5   Let's Encrypt — certbot setup, auto-renewal, wildcard vs multi-domain
+  §6   Rate limiting — zonas, burst, nodelay, limit_req_status 429
+  §7   Security hardening checklist — CVE check, TLS audit, header audit
+  §8   Fail2ban integration — jail.local completo para nginx-http-auth y botsearch
+  §9   Operations — comandos diarios, update seguro, log analysis con awk
+  §10  Troubleshooting — tabla de 10 errores comunes con diagnóstico y fix
+  §11  Adding a new service — plantilla estándar + certbot + reload
+  §12  Architecture Decision Guide — decisiones para este contexto de VPS
+
+
+CONFIGURACIÓN QUE GENERA EL AGENTE
+────────────────────────────────────
+El /nginx:setup genera estos archivos listos para usar:
+
+  Snippets compartidos (incluidos por todos los virtual hosts):
+  ├── /etc/nginx/snippets/ssl-params.conf
+  │   TLSv1.2 TLSv1.3, cipher suites fuertes, OCSP stapling, DH params
+  ├── /etc/nginx/snippets/security-headers.conf
+  │   HSTS (300s inicial), X-Frame-Options, X-Content-Type-Options
+  └── /etc/nginx/snippets/proxy-params.conf
+      Headers de proxy, timeouts, ocultar info del backend
+
+  Virtual host configs:
+  ├── 00-redirect.conf   → HTTP:80 → HTTPS + ACME challenge path
+  ├── 01-api.conf        → api.DOMAIN → shalapp-api:3000
+  │                         rate limit general + login endpoint más estricto
+  │                         + endpoint de upload con client_max_body_size 100m
+  ├── 02-web.conf        → DOMAIN → shalapp-web:8080
+  ├── 03-backoffice.conf → backoffice.DOMAIN → shalapp-backoffice:8082
+  └── 04-storage.conf    → storage.DOMAIN → minio:9000
+                            solo rutas logo/ y blog/ (público), 403 en resto
+                            proxy_buffering off (obligatorio para MinIO)
+
+
+COMANDOS /nginx:* — TABLA COMPLETA
+────────────────────────────────────
+
+  /nginx:review [path]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Audita configs existentes con CRITICAL/WARNING/SUGGESTION.
+              Detecta automáticamente: server_tokens no desactivado,
+              TLS 1.0/1.1 presente, headers de seguridad faltantes,
+              MinIO sin proxy_buffering off, rate limiting ausente en
+              endpoints de auth, CVE-2026-42945 vulnerable rewrite pattern.
+  Veredicto   ✅ Approved / ⚠️ Approved with warnings / ❌ Blocked
+  Ejemplos    /nginx:review /etc/nginx/nginx.conf
+              /nginx:review /etc/nginx/conf.d/01-api.conf
+              /nginx:review /etc/nginx/conf.d/  → todos los virtual hosts
+
+  /nginx:setup [domain]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera la configuración completa hardened para el stack
+              shalapp: 3 snippets compartidos + 5 virtual hosts +
+              DH params + certbot setup + comandos de verificación TLS.
+              Todo copy-paste listo con el dominio sustituido.
+  Output      8 archivos de config completos + secuencia de comandos
+  Ejemplos    /nginx:setup yourdomain.com
+              /nginx:setup yourdomain.com --with-ip-restrict-backoffice
+
+  /nginx:harden
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Hardening completo con score de seguridad X/10.
+              Checklist en orden: CVE-2026-42945 primero → server_tokens
+              → TLS protocols → cipher suites → security headers →
+              rate limiting → Fail2ban → puertos backend expuestos.
+              Genera todos los fix commands en orden de ejecución.
+  CVE Check   Afecta Nginx 0.6.27–1.30.0. Busca rewrite con unnamed
+              captures ($1, $2) + ? → CRITICAL si encontrado
+  Ejemplos    /nginx:harden              → audit completo
+              /nginx:harden --cve-only   → solo CVE-2026-42945
+              /nginx:harden --tls-only   → solo TLS audit
+              /nginx:harden --fix-only   → solo genera los fixes
+
+  /nginx:diagnose [error]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Diagnostica errores con 10 categorías de causa raíz.
+              Primero los comandos de diagnóstico para confirmar,
+              luego el fix exacto. Siempre termina con el comando
+              de verificación: nginx -t && systemctl reload nginx.
+  Categorías  Backend down / Wrong upstream port / Docker network /
+              Body size limit / Upstream timeout / MinIO streaming /
+              TLS expired / Rate limit / Location conflict / Config syntax
+  Ejemplos    /nginx:diagnose 502 on all API requests after deploying
+              /nginx:diagnose 413 when uploading files larger than 10MB
+              /nginx:diagnose MinIO uploads stall at 50%
+              /nginx:diagnose Nginx won't reload after config change
+              /nginx:diagnose Let's Encrypt cert expired
+              /nginx:diagnose rate limit is blocking real users
+
+  /nginx:add-service <name> <subdomain> <port> [--type]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera la config completa para un nuevo servicio numerada
+              correctamente (05-, 06-, etc.). 5 perfiles de rate limiting
+              según el tipo de servicio. Incluye el comando certbot para
+              agregar el dominio al cert existente de Let's Encrypt.
+  Perfiles    api       → zone=api burst=50 + auth=login
+              frontend  → zone=api burst=30
+              storage   → proxy_buffering off, client_max_body_size 0
+              admin     → zone=api burst=10 + optional IP restriction
+              websocket → Upgrade + Connection headers
+  Ejemplos    /nginx:add-service notifications notif.yourdomain.com 4000 --type websocket
+              /nginx:add-service reports reports.yourdomain.com 5000 --type api
+              /nginx:add-service docs docs.yourdomain.com 3010 --type frontend
+              /nginx:add-service admin-panel panel.yourdomain.com 8090 --type admin
+
+
+ROUTING DEL AGENTE — 6 RAMAS
+──────────────────────────────
+  Config Generation   → "create config", "setup", "configure Nginx for",
+                        "add a new service", "route", "new domain"
+  Security Hardening  → "harden", "secure", "audit", "CVE", "patch",
+                        "rate limit", "headers", "brute force"
+  Troubleshooting     → "502", "503", "504", "413", "403", "bad gateway",
+                        "timeout", "not working", "upstream"
+  TLS / Certs         → "SSL", "TLS", "certificate", "Let's Encrypt",
+                        "certbot", "renewal", "expired", "HSTS"
+  Rate Limiting       → "rate limit", "DDoS", "429", "block IPs",
+                        "Fail2ban", "bots", "brute force"
+  Log Analysis        → "logs", "who's hitting", "top IPs", "traffic",
+                        "monitor", "access log", "errors"
+
+
+HARD RULES — NUNCA VIOLA ESTAS 8
+──────────────────────────────────
+  1. Puertos 3000/8080/8082 nunca públicos — solo vía Nginx  [CRITICAL]
+  2. server_tokens off siempre                               [CRITICAL]
+  3. TLS 1.0 y 1.1 nunca — solo TLSv1.2 TLSv1.3             [CRITICAL]
+  4. Nunca nginx -t sin && systemctl reload nginx después
+  5. proxy_buffering off siempre para MinIO                   [CRITICAL]
+  6. HSTS max-age=300 en primer deploy — nunca 31536000 directo
+  7. Consola MinIO (9001/9002) nunca por Nginx — SSH tunnel
+  8. Verificar CVE-2026-42945 antes de cualquier audit/upgrade
+
+
+ANÁLISIS — QUÉ LO HACE ÚTIL
+─────────────────────────────
+  NGINX COMO ÚNICO PUNTO DE CONTACTO CON INTERNET:
+  El principio del agente es que todo lo que no es Nginx está oscuro
+  para el exterior. El compose actual expone el puerto 3000 del API
+  directamente — el agente sabe eso y lo flagea como CRITICAL en
+  cualquier review o harden. Los puertos de backend deben cerrarse
+  en el firewall del VPS y Nginx es el único que habla hacia afuera.
+
+  CVE-2026-42945 COMO PRIMER CHECK:
+  Es la vulnerabilidad más reciente y severa de Nginx (CVSS 9.2, RCE
+  potencial sin autenticación). Afecta versiones desde 0.6.27 hasta
+  1.30.0 — prácticamente cualquier instalación no actualizada. El agente
+  lo verifica primero en /nginx:harden y /nginx:review antes de cualquier
+  otra cosa. Fixed en 1.30.1+ y 1.31.0+.
+
+  LA REGLA DE HSTS QUE DUELE SI NO SE SIGUE:
+  HSTS con max-age largo en un dominio con problemas de certificado
+  deja a todos los usuarios sin forma de entrar aunque el admin quiera
+  revertir. El agente nunca genera max-age=31536000 en un setup inicial —
+  siempre 300 (5 minutos). Después de 24-48h de HTTPS estable se sube.
+
+  /nginx:add-service COMO MOTOR DE CRECIMIENTO:
+  Cuando tu stack agregue microservicios, agentes Akka, endpoints de
+  notificaciones, o cualquier nuevo backend, ese comando genera la config
+  completa en segundos con el perfil correcto (api/frontend/storage/admin/
+  websocket), numerada para el orden correcto de carga, y con el certbot
+  command para agregar el dominio. No hay que recordar la estructura.
+
+  MINÍO Y NGINX COMO EQUIPO:
+  La config de /04-storage.conf sabe que solo logo/ y blog/ son públicas
+  y que todo lo demás debe devolver 403. Los objetos privados van por
+  pre-signed URLs generadas desde el API — Nginx nunca los expone
+  directamente. Y proxy_buffering off es obligatorio para que los uploads
+  grandes de MinIO no se rompan a mitad.
+
+
+CASOS DE USO RÁPIDOS
+─────────────────────
+  Setup inicial completo del proxy:
+    /nginx:setup yourdomain.com
+
+  Auditoría de seguridad antes de ir a producción:
+    /nginx:harden
+
+  Diagnósticar por qué el API devuelve 502:
+    /nginx:diagnose 502 on API requests after last deploy
+
+  Agregar un nuevo microservicio de notificaciones:
+    /nginx:add-service notifications notif.yourdomain.com 4000 --type websocket
+
+  Verificar que las headers de seguridad están bien:
+    /nginx:review /etc/nginx/conf.d/
+
+  Revisar qué IPs están pegando más en los logs:
+    @"nginx-master (agent)" show me the top 20 IPs hitting the API in the last hour
+
+
+VERIFICAR INSTALACIÓN
+──────────────────────
+  claude
+  /agents   → debe listar nginx-master y minio-master
+  /help     → debe listar /nginx:* y /minio:*
+  /nginx:harden → corre audit completo de seguridad
+
+================================================================================

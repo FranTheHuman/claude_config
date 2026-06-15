@@ -1,0 +1,273 @@
+================================================================================
+  FE MASTER — RESUMEN COMPLETO DE CONFIGURACIÓN
+================================================================================
+
+QUÉ SE CONSTRUYÓ
+────────────────
+Un sub-agente especialista en Arquitectura Frontend y UX/UI para Claude Code,
+compuesto por tres piezas:
+
+  1. SKILL          ~/.claude/skills/fe-architecture/SKILL.md
+                    615 líneas de conocimiento técnico: rendering strategies,
+                    atomic design, state management, Core Web Vitals, Nielsen's
+                    heuristics, conversion UX, WCAG POUR accessibility,
+                    design systems, micro-frontend analysis, y mobile-first.
+
+  2. SUB-AGENTE     ~/.claude/agents/fe-master.md
+                    148 líneas de comportamiento: 6 ramas de routing, 8 hard
+                    rules, formato de respuesta. Precarga el skill
+                    automáticamente al arrancar (campo skills: fe-architecture).
+
+  3. COMANDOS       ~/.claude/commands/fe/
+                    5 comandos con prefijo /fe:* disponibles globalmente.
+
+
+ESTRUCTURA DE ARCHIVOS FINAL
+─────────────────────────────
+~/.claude/
+├── agents/
+│   ├── fe-master.md                ← sub-agente Frontend Architecture + UX/UI
+│   ├── react-master.md             ← sub-agente React 19
+│   ├── nodejs-master.md            ← sub-agente Node.js
+│   ├── akka-master.md              ← sub-agente Akka SDK
+│   └── quarkus-master.md           ← sub-agente Quarkus
+├── commands/
+│   ├── fe/
+│   │   ├── review.md               ← /fe:review
+│   │   ├── architecture.md         ← /fe:architecture
+│   │   ├── ux-audit.md             ← /fe:ux-audit
+│   │   ├── explain.md              ← /fe:explain
+│   │   └── diagnose.md             ← /fe:diagnose
+│   ├── react/                      ← /react:*
+│   ├── nodejs/                     ← /nodejs:*
+│   ├── akka/                       ← /akka:*
+│   └── quarkus/                    ← /quarkus:*
+└── skills/
+    ├── fe-architecture/
+    │   └── SKILL.md
+    ├── react-best-practices/
+    │   └── SKILL.md
+    ├── nodejs-best-practices/
+    │   └── SKILL.md
+    ├── akka-sdk/
+    │   └── SKILL.md
+    └── quarkus-reactive/
+        └── SKILL.md
+
+
+INSTALACIÓN
+────────────
+  mkdir -p ~/.claude/skills/fe-architecture ~/.claude/commands/fe
+  cp fe-master.md ~/.claude/agents/
+  cp SKILL.md ~/.claude/skills/fe-architecture/
+  cp commands/fe/*.md ~/.claude/commands/fe/
+
+  claude
+  /agents   # debe aparecer fe-master junto a los demás
+  /help     # debe listar /fe:*, /react:*, /nodejs:*, /akka:*, /quarkus:*
+
+
+QUÉ CUBRE EL SKILL (13 SECCIONES)
+───────────────────────────────────
+  §1   Diagnóstico previo (6 dimensiones: tipo de producto, equipo, SEO, etc.)
+  §2   Rendering Strategy — tabla de decisión + 5 patrones explicados
+  §3   Application Architecture — monolith, micro-frontends, Jamstack, PWA
+  §4   Component Architecture — atomic design, composition, container queries
+  §5   State Management — client vs server state, Zustand, TanStack Query
+  §6   Performance — Core Web Vitals targets, optimización por capa
+  §7   UX Principles — Nielsen's 10 heuristics con ejemplos y timing
+  §8   Conversion-Focused UX — hero formula, CTA copy, trust signals, forms
+  §9   Accessibility — WCAG POUR framework con código TypeScript
+  §10  Mobile-First — touch targets, thumb zones, real device testing
+  §11  Design Systems — tokens, dark mode, CSS custom properties
+  §12  Architecture Decision Guide — tabla de decisión completa
+  §13  Anti-Patterns — 13 patrones prohibidos con alternativa correcta
+
+
+COMANDOS /fe:* — TABLA COMPLETA
+─────────────────────────────────
+
+  /fe:review [path o descripción]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Revisa arquitectura, componentes, UX o diseño aplicando
+              Nielsen's heuristics, Core Web Vitals, WCAG, y conversion
+              principles. Detecta: CSR en páginas SEO-críticas, CTA copy
+              genérico, div onClick, trust signals solo en footer,
+              inputs sin label. Emite CRITICAL / WARNING / SUGGESTION.
+  Veredicto   ✅ Approved / ⚠️ Approved with warnings / ❌ Blocked
+  Ejemplos    /fe:review
+              /fe:review src/features/checkout/CheckoutPage.tsx
+              /fe:review src/features/landing/
+              /fe:review the homepage hero section and its CTA
+              /fe:review our rendering strategy for the product catalog
+
+  /fe:architecture [descripción del producto]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Diseña o evalúa una arquitectura frontend completa.
+              Primero clarifica requisitos, luego define: rendering
+              strategy por superficie, pattern de arquitectura (monolith
+              vs micro-frontends), estructura de componentes en atomic
+              design, state management por tipo de estado, data fetching,
+              performance budget, y tabla de trade-offs.
+  Output      Tabla de rendering por superficie + folder structure +
+              state ownership map + performance budget + trade-off table
+  Ejemplos    /fe:architecture an e-commerce with 500k products, SEO critical
+              /fe:architecture a SaaS analytics dashboard, real-time data
+              /fe:architecture evaluate our current architecture in src/
+              /fe:architecture should we migrate to micro-frontends?
+
+  /fe:ux-audit [página o flow]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Audita UX y conversión aplicando la fórmula hero de 4
+              elementos, los 10 heurísticas de Nielsen, checklist de
+              formularios, trust signals, mobile UX, y feedback states.
+              Ordena findings por impacto en negocio (revenue primero).
+  Output      Conversion Score X/10 + Critical Issues + Warnings +
+              Suggestions + 3 Quick Wins que se pueden shipear en un día
+  Ejemplos    /fe:ux-audit our checkout flow
+              /fe:ux-audit src/features/landing/HeroSection.tsx
+              /fe:ux-audit the pricing page — we have a high bounce rate
+              /fe:ux-audit the sign-up form — completion rate is only 30%
+
+  /fe:explain <concepto>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Explica cualquier patrón de arquitectura o principio UX con:
+              definición, mecánica, ejemplo de producto real, código,
+              errores comunes (❌ → ✅), y cuándo NO usarlo.
+  Ejemplos    /fe:explain ISR vs SSR
+              /fe:explain Islands Architecture
+              /fe:explain atomic design
+              /fe:explain container queries
+              /fe:explain micro-frontends
+              /fe:explain Core Web Vitals
+              /fe:explain Nielsen heuristics
+              /fe:explain conversion-focused CTA copy
+              /fe:explain when to use micro-frontends
+              /fe:explain stale-while-revalidate
+
+  /fe:diagnose [problema o métrica]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Diagnostica problemas concretos con 10 categorías de causa
+              raíz. Identifica la causa, explica el impacto en usuario y
+              negocio, provee el fix, y da la regla de prevención.
+  Categorías  Wrong rendering strategy / Poor LCP / Layout shift (CLS) /
+              Low conversion / Accessibility failure /
+              State management mismatch / Component coupling /
+              Micro-frontend premature / Design inconsistency /
+              Mobile UX failure
+  Ejemplos    /fe:diagnose our LCP is 4.2 seconds on the product page
+              /fe:diagnose form completion rate is 28%
+              /fe:diagnose our homepage has 75% bounce rate on mobile
+              /fe:diagnose CLS score of 0.35
+              /fe:diagnose checkout CTA has 2% click rate despite high traffic
+              /fe:diagnose 47 accessibility issues, where do we start
+
+
+ROUTING DEL AGENTE — 6 RAMAS
+──────────────────────────────
+  Architecture Decision   → "which rendering", "SSR vs SSG", "monolith vs",
+                            "should I use CSR", "micro-frontend"
+  Component Design        → "component", "atomic design", "design system",
+                            "reusable", "composition", "prop drilling"
+  UX/UI Review            → "review", "improve", "conversion", "UX audit",
+                            "redesign", "feedback on", "why is my conversion low"
+  Performance Analysis    → "slow", "Core Web Vitals", "LCP", "bundle size",
+                            "Lighthouse", "optimize"
+  Accessibility Audit     → "accessibility", "a11y", "WCAG", "screen reader",
+                            "keyboard", "aria", "contrast"
+  Frontend System Design  → "system design", "design a", "architect a",
+                            "scalable", "large scale", "interview"
+
+
+HARD RULES — NUNCA VIOLA ESTAS 8
+──────────────────────────────────
+  1. CSR nunca en páginas SEO-críticas públicas              [CRITICAL automático]
+  2. Micro-frontends nunca para equipos pequeños/medianos    [CRITICAL automático]
+  3. Accessibility siempre desde day one — nunca post-launch [CRITICAL automático]
+  4. CTA copy genérico nunca ("Submit", "Click here")       [CRITICAL automático]
+  5. Server data nunca en Redux/Zustand → TanStack Query
+  6. Todas las superficies evalúan rendering strategy propio
+  7. Trust signals nunca solo en footer → near CTAs
+  8. <div onClick> nunca → semantic <button> o <a>
+
+
+ANÁLISIS — QUÉ LO HACE ÚTIL
+─────────────────────────────
+
+  PUENTE ENTRE ARQUITECTURA TÉCNICA Y NEGOCIO:
+  Este agente no solo dice "usa SSR". Dice "usa SSR para las product pages
+  porque el LCP en SSG + revalidation está costando posicionamiento SEO y
+  afecta el 40% del tráfico orgánico". Conecta la decisión técnica con el
+  impacto en métricas de negocio en cada respuesta.
+
+  DIFERENTE AL REACT-MASTER:
+  react-master sabe cómo escribir un componente React 19 correctamente.
+  fe-master decide si ese componente debería existir en un Server Component
+  o Client Component, qué rendering strategy usa la página que lo contiene,
+  y si el layout donde vive va a tener CLS issues por falta de dimensiones
+  explícitas en las imágenes. Son capas distintas.
+
+  CONVERSIÓN COMO MÉTRICA DE DISEÑO:
+  El /fe:ux-audit no dice "tu botón está mal colocado". Dice "tu CTA copy
+  genérico ('Get Started') tiene un 3% CTR. Cambiarlo a 'Start Your Free
+  Trial' puede subir a 7-12% según los benchmarks de la industria. Aquí
+  está la corrección específica." Cada problema tiene impacto cuantificable.
+
+  ACCESSIBILITY INTEGRADA — NO COMO CHECKLIST:
+  WCAG POUR no es un checkbox post-lanzamiento. Está integrado en el review
+  de componentes, en el ux-audit, y en la generación de código TypeScript.
+  Cada componente interactivo que genere el agente incluye aria-*, role,
+  keyboard handlers, y focus management por defecto.
+
+  NIELSEN COMO FRAMEWORK SISTEMÁTICO:
+  Las 10 heurísticas estructuran el UX review de forma que no es "me parece"
+  sino "según la heurística 3 (user control and freedom), esta acción
+  destructiva necesita un paso de confirmación". Es auditable y defendible
+  ante stakeholders.
+
+
+DIFERENCIAS CON LOS OTROS AGENTES
+────────────────────────────────────
+  fe-master                         react-master
+  ────────────────────────────────  ────────────────────────────────
+  Rendering strategy por superficie Componentes React 19 correctos
+  Atomic design y design systems    Hooks, state, Server Components
+  Core Web Vitals y LCP             Performance de renders
+  Conversión y CTA copy             Formularios con useActionState
+  Nielsen's heuristics              Testing con Testing Library
+  WCAG POUR desde arquitectura      Accesibilidad a nivel de componente
+  Micro-frontend evaluation         Feature-based folder structure
+  Design tokens y theming           TypeScript patterns
+  Hybrid rendering decisions        Zustand + TanStack Query setup
+
+
+CASOS DE USO RÁPIDOS
+─────────────────────
+  Elegir rendering strategy para un e-commerce:
+    /fe:architecture an e-commerce with product catalog, user dashboard,
+    marketing pages, team of 5
+
+  Auditar una landing page con alta tasa de rebote:
+    /fe:ux-audit our landing page — 68% bounce rate, 1.2% conversion
+
+  Diagnosticar LCP lento:
+    /fe:diagnose LCP is 4.8 seconds on the homepage, Lighthouse score 42
+
+  Evaluar si migrar a micro-frontends:
+    /fe:explain when to use micro-frontends
+
+  Revisar accesibilidad de un form:
+    /fe:review src/features/auth/components/SignUpForm.tsx
+
+  Entender container queries vs breakpoints:
+    /fe:explain container queries
+
+
+VERIFICAR QUE TODO ESTÁ OK
+────────────────────────────
+  claude     → abrir Claude Code
+  /agents    → debe listar fe-master y los demás agentes
+  /help      → debe listar /fe:*, /react:*, /nodejs:*, /akka:*, /quarkus:*
+  /fe:explain Islands Architecture   → responde con conocimiento del skill
+
+================================================================================

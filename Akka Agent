@@ -1,0 +1,315 @@
+================================================================================
+  AKKA MASTER — RESUMEN COMPLETO DE CONFIGURACIÓN
+================================================================================
+
+QUÉ SE CONSTRUYÓ
+────────────────
+Un sub-agente especialista en el Akka Agentic Platform SDK para Claude Code,
+compuesto por dos piezas que trabajan juntas:
+
+  1. SKILL          ~/.claude/skills/akka-sdk/SKILL.md
+                    1064 líneas de conocimiento técnico: todos los componentes
+                    del SDK, patterns de orquestación multi-agente, SDD completo,
+                    patrones de alto volumen, testing, y guía de arquitectura.
+
+  2. SUB-AGENTE     ~/.claude/agents/akka-master.md
+                    153 líneas de comportamiento: routing de pedidos, hard rules,
+                    formato de respuesta. Precarga el skill automáticamente
+                    al arrancar (campo skills: akka-sdk).
+
+
+ESTRUCTURA DE ARCHIVOS FINAL
+─────────────────────────────
+~/.claude/
+├── agents/
+│   ├── akka-master.md              ← sub-agente Akka (nuevo)
+│   └── quarkus-master.md           ← sub-agente Quarkus (previo)
+├── commands/
+│   └── quarkus/                    ← comandos /quarkus:*
+└── skills/
+    ├── akka-sdk/
+    │   └── SKILL.md                ← conocimiento técnico Akka
+    └── quarkus-reactive/
+        └── SKILL.md                ← conocimiento técnico Quarkus
+
+
+QUÉ CUBRE EL SKILL (17 SECCIONES)
+───────────────────────────────────
+  §1   Diagnóstico previo al código (4 dimensiones antes de escribir)
+  §2   Tabla de decisión de componentes (qué usar para cada caso)
+  §3   Estructura de proyecto obligatoria (api / application / domain)
+  §4   Effects API — declarar el qué, no el cómo
+  §5   Agents — estructura, modelo, session memory, tools, streaming
+  §6   Workflows — settings, pausa, compensación, concurrencia
+  §7   Event Sourced Entities — eventos, applyEvent, @TypeName
+  §8   Key Value Entities — state model, TTL, idempotencia
+  §9   Views — CQRS, queries, streaming updates, schema evolution
+  §10  HTTP Endpoints — ACL, SSE, error handling, body/path/query params
+  §11  Consumers — todas las fuentes, productor a topic, at-least-once
+  §12  Multi-Agent Orchestration — patrones permitidos y prohibidos
+  §13  Spec-Driven Development — ciclo completo /akka:* commands
+  §14  Testing — TestKit, TestModelProvider, mocked topics, Awaitility
+  §15  Code Quality Rules — arquitectura, entities, views, agents
+  §16  Architecture Decision Guide — tabla de decisión extendida
+  §17  High-Volume Processing — 7 patrones para millones de eventos/seg
+
+
+ROUTING DEL AGENTE — 6 RAMAS
+──────────────────────────────
+El akka-master clasifica cada pedido y aplica el approach correspondiente:
+
+  SDD (Spec-Driven Development)
+  ─────────────────────────────
+  Detecta: "new feature", "from scratch", "specify", "/akka:*"
+  → Guía el ciclo completo en orden estricto
+  → Nunca salta clarify antes de plan
+  → Separa "qué" (spec) de "cómo" (plan)
+
+  Code Generation
+  ───────────────
+  Detecta: "create", "generate", "write", "implement", "add"
+  → Selecciona el componente correcto de la tabla §2
+  → Verifica capa de destino (api/application/domain)
+  → Genera código completo + test skeleton
+
+  Code Review / Refactor
+  ──────────────────────
+  Detecta: "review", "refactor", "check", "improve", "fix"
+  → Verifica capas primero (domain importando Akka → CRITICAL inmediato)
+  → Detecta agent-to-agent calls → CRITICAL inmediato
+  → Emite CRITICAL / WARNING / SUGGESTION con código corregido
+
+  Architecture Question
+  ─────────────────────
+  Detecta: "should I", "Agent vs Workflow", "ESE vs KVE", "explain"
+  → Usa tabla §16 como referencia primaria
+  → Ejemplo de código por cada opción
+  → Recomendación clara, nunca ambigua
+
+  Debugging / Error Analysis
+  ──────────────────────────
+  Detecta: "error", "exception", "fails", "stacktrace"
+  → 7 categorías de causa raíz específicas de Akka
+  → Fix con explicación del modelo de la plataforma
+
+  High-Volume / High-Throughput
+  ──────────────────────────────
+  Detecta: "millones de eventos", "scale", "throughput", "kafka",
+           "batch", "pipeline", "gran volumen", "1M TPS"
+  → Diagnóstico del cuello de botella (write/read/pipeline)
+  → 7 patrones de alto volumen de la sección §17
+  → Siempre marca idempotencia como obligatoria
+
+
+HARD RULES — NUNCA VIOLA ESTAS 8
+──────────────────────────────────
+  1. Agents nunca llaman a otros Agents directamente
+     → refactorizar a Workflow orchestration [CRITICAL automático]
+
+  2. Domain layer tiene cero imports de Akka
+     → puro Java sin dependencias de framework [CRITICAL automático]
+
+  3. applyEvent() siempre pura
+     → sin I/O, sin ComponentClient, sin side effects
+
+  4. Todos los eventos de ESE tienen @TypeName
+     → sin esto, renombrar una clase rompe la deserialización en prod
+
+  5. Nunca cambiar el @Component id después de deploy en producción
+     → entities: pierde todo el estado
+     → views: rebuilding completo desde cero
+
+  6. Todo HTTP endpoint tiene @Acl explícito
+     → sin anotación = 403 para todos los callers
+
+  7. Step timeouts para LLM calls siempre > 30 segundos
+     → el default de 5s es insuficiente para cualquier modelo
+
+  8. Effects son el único mecanismo para cambiar estado
+     → nunca mutar estado directamente en command handlers
+
+
+ANÁLISIS — QUÉ LO HACE ÚTIL PARA TU CASO
+──────────────────────────────────────────
+
+  PARA SDD:
+  El agente conoce el ciclo completo de Spec-Driven Development y sus
+  invariantes clave. Sabe que el spec describe el QUÉ y el plan describe
+  el CÓMO — si le pedís código sin pasar por el ciclo, lo detecta y
+  propone el flujo correcto antes de generar. También sabe que clarify
+  antes de plan no es opcional — los gaps en el spec se convierten en
+  arquitectura incorrecta.
+
+  PARA AGENTES Y WORKFLOWS:
+  El anti-patrón más peligroso del SDK (Agent llamando a Agent) está
+  codificado como CRITICAL con flag automático. El agente siempre
+  redirige a orquestación via Workflow. Conoce los patrones de
+  SelectorAgent + PlannerAgent + dynamicCall para sistemas donde el
+  conjunto de agentes se determina en runtime.
+
+  PARA ALTO VOLUMEN:
+  La sección §17 cubre exactamente los problemas que aparecen cuando
+  el sistema escala: hotspot entities, fan-out async, idempotencia,
+  CQRS con Views, service-to-service eventing sin broker, y la
+  diferencia entre replicated reads y CRDT según el patrón de escritura.
+  El agente puede diagnosticar el cuello de botella antes de proponer
+  una solución.
+
+  SEPARACIÓN DE STACKS:
+  Como los proyectos de Akka y Quarkus son stacks separados, no hay
+  riesgo de que el agente mezcle conceptos. El sub-agente de Akka
+  solo se activa cuando lo invocás explícitamente, y el de Quarkus
+  cuando trabajás en ese stack.
+
+
+CÓMO INVOCAR — FORMAS DE USO
+──────────────────────────────
+
+1. LENGUAJE NATURAL (Claude decide si delegar)
+   ─────────────────────────────────────────────
+   "Use the akka-master agent to design a payment processing workflow"
+   "Usa el agente akka-master para implementar el Consumer de órdenes"
+
+2. @-MENTION (garantiza que use ese sub-agente)
+   ──────────────────────────────────────────────
+   @"akka-master (agent)" revisa OrderProcessor.java
+   @"akka-master (agent)" diseña el flujo multi-agente para trip planning
+   @"akka-master (agent)" qué componente uso para procesar 1M eventos/seg
+
+3. SESIÓN COMPLETA COMO AKKA-MASTER
+   ────────────────────────────────────
+   claude --agent akka-master
+   → Toda la sesión corre bajo el agente Akka.
+     Ideal para sprints completos de desarrollo Akka.
+
+COMANDOS /akka:* — TABLA COMPLETA
+───────────────────────────────────
+ 
+  /akka:review [path]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Revisa código SDK con severidades CRITICAL / WARNING /
+              SUGGESTION. Detecta agent-to-agent calls, applyEvent
+              impuro, @Component id inestable, y @Acl faltante.
+  Veredicto   ✅ Approved / ⚠️ Approved with warnings / ❌ Blocked
+  Ejemplos    /akka:review
+              /akka:review src/main/java/com/example/application/OrderWorkflow.java
+              /akka:review src/main/java/com/example/application/
+ 
+  /akka:specify <feature-name> - <descripción qué y por qué>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Primer paso del ciclo SDD. Produce el spec formal con
+              user stories, requisitos funcionales, edge cases, y
+              supuestos. Solo el QUÉ — nunca detalles técnicos.
+  Output      specs/NNN-<name>/spec.md
+  Ejemplos    /akka:specify payment-processing - Users can pay for orders
+              using credit card. Payments must be idempotent and retry
+              automatically up to 3 times on failure.
+ 
+  /akka:plan <descripción técnica de arquitectura>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Segundo paso SDD. Produce el plan técnico: componentes
+              elegidos y por qué, data model, HTTP API contract, step
+              sequencing, session strategy, recovery strategy, test plan.
+  Output      specs/NNN-.../plan.md + research.md + data-model.md
+              + contracts/http-api.md
+  Ejemplos    /akka:plan Implement as a Workflow with two steps: charge
+              and notify. Use EventSourcedEntity for payment records.
+              POST /payments endpoint. Retry up to 3 times.
+ 
+  /akka:new-component <type> <Name> [opciones]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera un componente Akka completo con su test class.
+              Tipos: agent | workflow | ese | kve | view | endpoint
+              Siempre incluye: @TypeName en eventos, @Component estable,
+              timeouts correctos para LLM calls, @Acl en endpoints.
+  Ejemplos    /akka:new-component agent RecommendationAgent --tools inventory,pricing
+              /akka:new-component workflow PaymentWorkflow --steps charge,notify,compensate
+              /akka:new-component ese OrderEntity --package com.example.orders
+              /akka:new-component endpoint OrderEndpoint
+              /akka:new-component view OrdersByStatusView
+ 
+  /akka:explain <concepto|path>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Explica cualquier concepto del SDK con: definición,
+              comportamiento en runtime, ejemplo mínimo, ejemplo
+              realista, errores comunes, y cuándo NO usarlo.
+  Ejemplos    /akka:explain EventSourcedEntity
+              /akka:explain Agent vs Workflow
+              /akka:explain applyEvent
+              /akka:explain session memory
+              /akka:explain replicated reads vs CRDT
+              /akka:explain src/main/java/com/example/application/PaymentWorkflow.java
+ 
+  /akka:diagnose [error o stacktrace]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Diagnostica errores con 10 categorías de causa raíz
+              específicas de Akka. Identifica categoría, explica el
+              mecanismo de falla, y provee fix compilable con justificación.
+  Categorías  Agent calling Agent / applyEvent con side effects /
+              @TypeName faltante / @Component id cambiado /
+              Step timeout muy corto / @Acl faltante /
+              Domain importando Akka / Error no forwarded /
+              applyEvent bloqueante / Hotspot entity
+  Ejemplos    /akka:diagnose TimeoutException in PaymentWorkflow step charge
+              /akka:diagnose entity state is empty after renaming the class
+              /akka:diagnose HTTP 403 on all requests to /api/orders
+              /akka:diagnose workflow step retries indefinitely
+
+COMANDOS ÚTILES POR CASO DE USO
+─────────────────────────────────
+
+SDD — nuevo feature desde cero:
+  /akka:setup
+  /akka:specify <nombre> - <descripción qué y por qué, sin detalles técnicos>
+  /akka:clarify
+  /akka:plan <arquitectura y decisiones técnicas>
+  /akka:tasks
+  /akka:implement
+  /akka:review
+  /akka:build
+  /akka:inspect
+  /akka:deploy
+
+Preguntas de arquitectura rápidas:
+  @"akka-master (agent)" cuándo usar ESE vs KVE
+  @"akka-master (agent)" cómo evitar un hotspot entity en alta concurrencia
+  @"akka-master (agent)" cómo compartir sesión entre múltiples agentes
+  @"akka-master (agent)" cuándo usar replicated reads vs CRDT
+
+Revisar código existente:
+  @"akka-master (agent)" revisa src/main/java/com/example/application/
+  @"akka-master (agent)" hay algún anti-pattern en este Workflow?
+
+Debugging:
+  @"akka-master (agent)" [pegar stacktrace]
+  @"akka-master (agent)" el Consumer se detiene después de 1000 mensajes, por qué?
+  @"akka-master (agent)" el View no se actualiza, cómo lo diagnostico?
+
+Alto volumen:
+  @"akka-master (agent)" cómo proceso 5M eventos/día de Kafka sin perder mensajes
+  @"akka-master (agent)" tengo un entity que recibe todas las escrituras, cómo lo escalo
+  @"akka-master (agent)" diseñá un pipeline de batch processing con recovery automático
+
+
+DIFERENCIAS CLAVE CON EL AGENTE DE QUARKUS
+─────────────────────────────────────────────
+  Akka                              Quarkus
+  ────────────────────────────────  ──────────────────────────────
+  SDD como flujo primario           No tiene SDD
+  Effects API (declarativo)         Mutiny (reactivo)
+  Actor runtime (sin blocking)      I/O thread + @Blocking
+  Entities como unidad de estado    Hibernate Reactive + Panache
+  Workflow para orquestación        No tiene equivalente directo
+  Agent como componente de primera  Integración con Vert.x event bus
+  Consumer para streaming           SmallRye Reactive Messaging
+  Multi-region built-in             Requiere configuración externa
+
+
+VERIFICAR QUE TODO ESTÁ OK
+────────────────────────────
+  claude           → abrir Claude Code
+  /agents          → debe listar akka-master y quarkus-master
+  @"akka-master (agent)" explica cuándo usar un Workflow vs un Agent
+  → responde con conocimiento del skill, no con conocimiento genérico
+
+================================================================================

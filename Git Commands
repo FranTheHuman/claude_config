@@ -1,0 +1,27 @@
+# 1. Hacés tus cambios
+# 2. Stage lo que va junto
+git add src/orders/orders.service.ts
+
+# 3. Pedís sugerencias
+/git:commit
+
+# Claude ejecuta git diff --staged, analiza, y devuelve:
+
+### Qué cambió
+Se agregó lógica de reintento con backoff exponencial al servicio
+de órdenes. El cambio afecta solo el flujo de procesamiento de
+pagos fallidos, sin modificar el contrato de la API.
+
+### Opciones
+
+Opción 1 — específica (recomendada)
+  feat(orders): add exponential backoff retry for failed payment processing
+
+Opción 2 — alcance más amplio
+  feat(payments): add retry logic on processing failure
+
+Opción 3 — mínima
+  feat: add payment retry with backoff
+
+# 4. Copiás el que más te gusta y commiteás
+git commit -m "feat(orders): add exponential backoff retry for failed payment processing"

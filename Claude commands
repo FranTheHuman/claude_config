@@ -1,0 +1,55 @@
+============================================================
+           CLAUDE CODE - HOJA DE TRUCOS (TXT)
+============================================================
+
+[ COMANDOS DE INICIO ]
+------------------------------------------------------------
+claude              - Inicia Claude Code en el directorio actual.
+claude login        - Autentica tu cuenta de Anthropic.
+claude logout       - Cierra la sesión.
+claude --help       - Muestra la ayuda general.
+
+
+[ COMANDOS DENTRO DE LA TERMINAL (MODO INTERACTIVO) ]
+------------------------------------------------------------
+/init               - Genera como un README.md pero de claude para su contexto
+/exit               - Sale de Claude Code.
+/clear              - Limpia el historial de la conversación actual.
+/compact            - Reduce el contexto para ahorrar tokens.
+/undo               - Deshace el último cambio de archivo realizado.
+/retry              - Reintenta la última respuesta de Claude.
+/config             - Abre o muestra la configuración actual.
+/hooks              - Añade comandos o eventos en determinadas acciones. por ejemplo, al final de añadir un nuevo feature ejecuta el comando de los tests, e
+
+
+[ SHORTCUTS / ATAJOS DE TECLADO (DENTRO DE CLAUDE) ]
+------------------------------------------------------------
+Ctrl + c            - Interrumpe la generación de código actual.
+Ctrl + d            - Salir (equivalente a /exit).
+Tab                 - Autocompletar nombres de archivos o comandos.
+Up / Down Arrows    - Navegar por el historial de comandos enviados.
+
+
+AGREGAR CONTEXTO
+
+
+https://www.skills.sh/
+AGENT SKILL -> DIRECTORIO DE CONOCIMIENTO (folder con md) donde podemos definir reglas, patrones que queremos que el proyecto siga.
+
+DESCARGAR FIND SKILLS -> npx skills add https://github.com/vercel-labs/skills --skill find-skills
+
+Crear skill con las practicas del repositorio
+
+
+/agents - especialista en algo y automatizado.
+
+Ejemplo crear el de qarkus: Act as a Senior Quarkus & Java Architect. Your mission is to design high-performance, cloud-native microservices. Focus on Quarkus Mutiny for reactive programming, Hibernate Reactive with Panache, and GraalVM optimization for native executables. Provide clean, production-ready code with a focus on low memory footprint and sub-second startup times.
+
+ @"general-purpose (agent)"
+ 
+ 
+ 
+ ROUTING LOGICS EN EL CLAUDE.MD PARA QUE EN CADA CAMBIO SE REDIRIGA A CADA AGENTE QUE APLICA PARA LA TAREA ESPECIFICA
+ 
+ -----------------
+ 

@@ -1,0 +1,283 @@
+================================================================================
+  NODEJS MASTER — RESUMEN COMPLETO DE CONFIGURACIÓN
+================================================================================
+
+QUÉ SE CONSTRUYÓ
+────────────────
+Un sub-agente especialista en Node.js server-side para Claude Code, compuesto
+por tres piezas que trabajan juntas:
+
+  1. SKILL          ~/.claude/skills/nodejs-best-practices/SKILL.md
+                    953 líneas de conocimiento técnico: arquitectura por
+                    features, capas (routes/controller/service/repository),
+                    async/await, error handling centralizado, validación Zod,
+                    seguridad, event loop, clustering, logging Pino, testing
+                    Jest, TypeScript, Docker, OpenAPI, y 18 anti-patterns.
+
+  2. SUB-AGENTE     ~/.claude/agents/nodejs-master.md
+                    156 líneas de comportamiento: 7 ramas de routing, 8 hard
+                    rules, formato de respuesta. Precarga el skill
+                    automáticamente al arrancar (campo skills:).
+
+  3. COMANDOS       ~/.claude/commands/nodejs/
+                    5 comandos con prefijo /nodejs:* disponibles globalmente.
+
+
+ESTRUCTURA DE ARCHIVOS FINAL
+─────────────────────────────
+~/.claude/
+├── agents/
+│   └── nodejs-master.md            ← sub-agente Node.js
+├── commands/
+│   └── nodejs/
+│       ├── review.md               ← /nodejs:review
+│       ├── scaffold.md             ← /nodejs:scaffold
+│       ├── new-feature.md          ← /nodejs:new-feature
+│       ├── explain.md              ← /nodejs:explain
+│       └── diagnose.md             ← /nodejs:diagnose
+└── skills/
+    └── nodejs-best-practices/
+        └── SKILL.md
+
+
+INSTALACIÓN
+────────────
+  mkdir -p ~/.claude/commands/nodejs
+  cp nodejs-master.md ~/.claude/agents/
+  cp SKILL.md ~/.claude/skills/nodejs-best-practices/
+  cp commands/nodejs/*.md ~/.claude/commands/nodejs/
+
+  claude
+  /agents   # debe aparecer nodejs-master junto a akka-master y quarkus-master
+  /help     # debe listar /nodejs:*
+
+
+QUÉ CUBRE EL SKILL (18 SECCIONES)
+───────────────────────────────────
+  §1   Diagnóstico previo (6 dimensiones antes de escribir una línea)
+  §2   Estructura de proyecto feature-based (nunca por capa técnica)
+  §3   Arquitectura en capas — tabla de responsabilidades por capa
+  §4   Async/await — reglas, parallel operations, promisify
+  §5   Error handling centralizado — AppError, error middleware Express
+  §6   Validación con Zod — schemas, middleware, tipos inferred
+  §7   Seguridad — Helmet, rate limiting, JWT, bcrypt, env vars
+  §8   Event loop — qué lo bloquea, Worker Threads, BullMQ, Redis
+  §9   Clustering y PM2 — multi-core, ecosystem.config.js
+  §10  Logging estructurado con Pino — niveles, redact, request logger
+  §11  Testing — unit con Jest, integration con Supertest, checklist
+  §12  TypeScript — tsconfig strict, package.json scripts
+  §13  Containerización — Dockerfile multi-stage, non-root, healthcheck
+  §14  OpenAPI/Swagger — JSDoc annotations
+  §15  Dependency Injection — constructor injection, manual wiring
+  §16  ESLint — configuración con plugins de seguridad, no-console
+  §17  Architecture Decision Guide — tabla de decisión completa
+  §18  Anti-patterns — 12 patrones prohibidos con alternativa correcta
+
+
+ARQUITECTURA QUE GENERA EL AGENTE
+───────────────────────────────────
+Cada feature siempre tiene exactamente estas 5 capas:
+
+  src/
+  └── <feature>/
+      ├── <feature>.routes.ts      ← registra rutas + middleware, nada más
+      ├── <feature>.controller.ts  ← parsea request, llama service, responde
+      ├── <feature>.service.ts     ← reglas de negocio, lanza AppError
+      ├── <feature>.repository.ts  ← queries DB únicamente
+      └── <feature>.validation.ts  ← schemas Zod, tipos inferidos
+
+  src/shared/
+  ├── config.ts             ← validación Zod de env vars, exit(1) si falta
+  ├── errors.ts             ← AppError, NotFoundError, ConflictError...
+  ├── logger.ts             ← Pino estructurado, request middleware
+  ├── database.ts           ← conexión DB
+  └── middleware/
+      ├── error.middleware.ts   ← handler centralizado, último en app.ts
+      ├── validate.middleware.ts← Zod body/params/query
+      └── auth.middleware.ts    ← requireAuth, requireRole
+
+
+COMANDOS /nodejs:* — TABLA COMPLETA
+─────────────────────────────────────
+
+  /nodejs:review [path]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Revisa código Node.js/TypeScript con los 18 anti-patterns
+              del skill. Detecta: console.log en prod, secrets hardcoded,
+              DB queries en controllers, missing await, inline error
+              responses, y falta de validación.
+  Veredicto   ✅ Approved / ⚠️ Approved with warnings / ❌ Blocked
+  Ejemplos    /nodejs:review
+              /nodejs:review src/users/users.controller.ts
+              /nodejs:review src/users/
+              /nodejs:review src/
+
+  /nodejs:scaffold <project> [--feature <name>] [--db knex|prisma]
+                             [--auth jwt|session] [--js]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera un proyecto Node.js completo desde cero. Incluye:
+              toda la infraestructura shared, app.ts + server.ts con
+              clustering, Dockerfile multi-stage con non-root user,
+              docker-compose con DB + Redis, tsconfig strict, ESLint
+              con plugins de seguridad, .env.example, health check
+              endpoint, y primer feature completo como template.
+  Ejemplos    /nodejs:scaffold ecommerce-api --feature products --db prisma
+              /nodejs:scaffold task-manager --feature tasks --db knex --auth jwt
+              /nodejs:scaffold reporting-service --feature reports --js
+
+  /nodejs:new-feature <name> [field:type ...] [--ops ...] [--auth]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Genera las 5 capas de un feature SIEMPRE juntas, nunca
+              sueltas: validation + repository + service + controller
+              + routes. Incluye test skeleton para la capa de service.
+              Nunca genera solo un controller suelto.
+  Ejemplos    /nodejs:new-feature products name:string price:number category:string
+              /nodejs:new-feature orders --ops create,list,get --auth
+              /nodejs:new-feature categories name:string --ops get,list,create
+
+  /nodejs:explain <concepto|path>
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Explica cualquier concepto Node.js con: definición,
+              comportamiento, ejemplo mínimo, ejemplo realista,
+              errores comunes (❌ → ✅), y cuándo NO usarlo.
+  Ejemplos    /nodejs:explain async/await
+              /nodejs:explain centralized error handling
+              /nodejs:explain event loop
+              /nodejs:explain clustering vs worker threads
+              /nodejs:explain Zod vs Joi
+              /nodejs:explain Redis caching strategy
+              /nodejs:explain src/users/users.service.ts
+
+  /nodejs:diagnose [error o stacktrace]
+  ─────────────────────────────────────────────────────────────────────
+  Qué hace    Diagnostica errores con 10 categorías de causa raíz
+              específicas de Node.js. Identifica categoría, explica el
+              mecanismo de falla en términos del event loop y el modelo
+              de capas, y provee fix TypeScript completo.
+  Categorías  Blocked event loop / Unhandled promise rejection /
+              Missing await / Layer violation / Missing error forwarding /
+              Memory leak / Missing validation / Hardcoded secret /
+              Sync I/O in handler / Missing try/catch on async
+  Ejemplos    /nodejs:diagnose UnhandledPromiseRejectionWarning in orders controller
+              /nodejs:diagnose all requests are timing out after deploy
+              /nodejs:diagnose TypeError: Cannot read property 'id' of undefined
+              /nodejs:diagnose memory usage keeps growing and never drops
+              /nodejs:diagnose endpoint returns 200 but data is not saved
+
+
+ROUTING DEL AGENTE — 7 RAMAS
+──────────────────────────────
+  Project Setup    → "new project", "scaffold", "from scratch", "initialize"
+  Code Generation  → "create", "generate", "new endpoint", "new feature"
+  Code Review      → "review", "refactor", "check", "improve"
+  Architecture     → "should I", "where does X go", "service vs controller"
+  Debugging        → "error", "exception", "fails", "stacktrace", "slow"
+  Security Audit   → "security", "auth", "JWT", "helmet", "injection"
+  Performance      → "slow", "optimize", "cache", "event loop blocked"
+
+
+HARD RULES — NUNCA VIOLA ESTAS 8
+──────────────────────────────────
+  1. Business logic nunca en controllers ni routes        [CRITICAL automático]
+  2. DB queries nunca en services                         [CRITICAL automático]
+  3. console.log() nunca en código de producción          [WARNING automático]
+  4. Todos los errores van por next(error) al middleware  [CRITICAL]
+  5. Secrets nunca hardcodeados en el código              [CRITICAL]
+  6. Todos los async operations usan await                [CRITICAL]
+  7. Todo incoming data validado con Zod antes del service[CRITICAL]
+  8. TypeScript any nunca usado                           [WARNING]
+
+
+ANÁLISIS — QUÉ LO HACE ÚTIL
+─────────────────────────────
+
+  PARA PROYECTOS NUEVOS:
+  /nodejs:scaffold genera la base completa en un solo comando: shared
+  infrastructure lista, Docker configurado con non-root user, ESLint
+  con plugins de seguridad, y el primer feature completo como template
+  que el equipo puede copiar para cada nueva funcionalidad. Evita los
+  15-20 archivos de setup que normalmente se improvisan en cada proyecto.
+
+  PARA FEATURES EN PROYECTOS EXISTENTES:
+  /nodejs:new-feature garantiza que nunca se genere una sola capa
+  suelta. Si pedís "un controller para orders", el agente genera las
+  5 capas juntas con la regla de que la separación de responsabilidades
+  no es opcional. Esto fuerza el patrón correcto desde el primer archivo.
+
+  PARA CODE REVIEW:
+  La tabla de 18 anti-patterns del skill §18 mapea exactamente cada
+  patrón prohibido con su alternativa correcta. El agente no solo
+  detecta "hay un console.log" — explica por qué es un problema en
+  producción y genera el reemplazo con Pino estructurado.
+
+  PARA SEGURIDAD:
+  La rama Security Audit tiene un checklist de 7 ítems que cubre
+  Helmet, rate limiting, JWT, bcrypt cost factor, secrets en env,
+  non-root Docker, y sanitización de input. Cada gap es CRITICAL
+  con fix concreto, no solo una advertencia genérica.
+
+  PARA DEBUGGING:
+  Las 10 categorías de causa raíz son específicas del modelo de Node.js
+  — no son genéricas. "Missing await" explica la race condition en
+  términos del event loop. "Layer violation" explica qué capa debería
+  tener el código y por qué. Siempre termina con la regla de ESLint
+  o el hábito de arquitectura para prevenirlo.
+
+
+DIFERENCIAS CON QUARKUS Y AKKA
+────────────────────────────────
+  Node.js                           Quarkus                 Akka
+  ────────────────────────────────  ──────────────────────  ──────────────────
+  /nodejs:scaffold (proyecto)       No tiene                No tiene
+  /nodejs:new-feature (4 capas)     /quarkus:new-entity     /akka:new-component
+  /nodejs:review                    /quarkus:review         /akka:review
+  /nodejs:explain                   /quarkus:explain        /akka:explain
+  /nodejs:diagnose                  /quarkus:diagnose       /akka:diagnose
+  No tiene SDD                      No tiene SDD            /akka:specify + plan
+  TypeScript por defecto            Java                    Java
+  Express + capas manuales          Hibernate Reactive      Effects API declarativa
+  Pino para logging                 Quarkus logging         Akka logging
+
+
+CÓMO INVOCAR
+─────────────
+  claude --agent nodejs-master                  ← sesión completa como Node.js
+  @"nodejs-master (agent)" <pedido>             ← @-mention garantizado
+  "Use the nodejs-master agent to..."           ← lenguaje natural
+
+  /nodejs:scaffold ecommerce-api --feature products --db prisma
+  /nodejs:new-feature orders name:string total:number --auth
+  /nodejs:review src/orders/orders.controller.ts
+  /nodejs:explain event loop
+  /nodejs:diagnose [pegar stacktrace]
+
+
+CASOS DE USO RÁPIDOS
+─────────────────────
+  Proyecto nuevo completo:
+    /nodejs:scaffold my-api --feature users --db prisma --auth jwt
+
+  Agregar un feature a proyecto existente:
+    /nodejs:new-feature products name:string price:number --ops get,list,create,update
+
+  Revisar antes de un PR:
+    /nodejs:review src/orders/
+
+  Entender un error de producción:
+    /nodejs:diagnose [pegar el stacktrace completo]
+
+  Entender cuándo usar Worker Threads vs BullMQ:
+    /nodejs:explain clustering vs worker threads
+
+  Auditar seguridad de un módulo:
+    @"nodejs-master (agent)" audit security of src/auth/
+
+
+VERIFICAR QUE TODO ESTÁ OK
+────────────────────────────
+  claude     → abrir Claude Code
+  /agents    → debe listar nodejs-master, akka-master, quarkus-master
+  /help      → debe listar /nodejs:*, /akka:*, /quarkus:*
+  /nodejs:explain async/await   → responde con conocimiento del skill
+
+================================================================================
